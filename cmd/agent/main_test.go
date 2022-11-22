@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"runtime"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 
