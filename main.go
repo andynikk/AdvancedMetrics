@@ -11,4 +11,5 @@ func main() {
 	}
 
 	metrics.Read(samples)
+	println(v)
 }
