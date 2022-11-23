@@ -137,7 +137,6 @@ func BenchmarkSendMetrics(b *testing.B) {
 			defer wg.Done()
 			agent.goPost2Server(allMetrics)
 		}()
-		//agent.goPost2Server(allMetrics)
 	}
 	wg.Wait()
 }

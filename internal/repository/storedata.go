@@ -28,23 +28,14 @@ type MapTypeStore = map[string]TypeStoreData
 type TypeStoreData interface {
 	WriteMetric(storedData encoding.ArrMetrics)
 	GetMetric() ([]encoding.Metrics, error)
-	CreateTable()
+	CreateTable() bool
 	ConnDB() *pgxpool.Pool
 	SetMetric2DB(storedData encoding.ArrMetrics) error
 }
 
 func (sdb *TypeStoreDataDB) WriteMetric(storedData encoding.ArrMetrics) {
 	dataBase := sdb.DBC
-	tx, err := dataBase.Pool.Begin(dataBase.Context.Ctx)
-	if err != nil {
-		constants.Logger.ErrorLog(err)
-	}
-
 	if err := dataBase.SetMetric2DB(storedData); err != nil {
-		constants.Logger.ErrorLog(err)
-	}
-
-	if err := tx.Commit(dataBase.Context.Ctx); err != nil {
 		constants.Logger.ErrorLog(err)
 	}
 }
@@ -52,8 +43,19 @@ func (sdb *TypeStoreDataDB) WriteMetric(storedData encoding.ArrMetrics) {
 func (sdb *TypeStoreDataDB) GetMetric() ([]encoding.Metrics, error) {
 	var arrMatrics []encoding.Metrics
 
-	poolRow, err := sdb.DBC.Pool.Query(sdb.Ctx, constants.QuerySelect)
+	ctx := context.Background()
+	defer ctx.Done()
+
+	conn, err := sdb.DBC.Pool.Acquire(ctx)
 	if err != nil {
+		constants.Logger.ErrorLog(err)
+		return nil, errors.New("ошибка создания соединения с БД")
+	}
+	defer conn.Release()
+
+	poolRow, err := conn.Query(sdb.Ctx, constants.QuerySelect)
+	if err != nil {
+		conn.Release()
 		constants.Logger.ErrorLog(err)
 		return nil, errors.New("ошибка чтения БД")
 	}
@@ -70,6 +72,9 @@ func (sdb *TypeStoreDataDB) GetMetric() ([]encoding.Metrics, error) {
 		arrMatrics = append(arrMatrics, nst)
 	}
 
+	ctx.Done()
+	conn.Release()
+
 	return arrMatrics, nil
 }
 
@@ -77,16 +82,31 @@ func (sdb *TypeStoreDataDB) ConnDB() *pgxpool.Pool {
 	return sdb.DBC.Pool
 }
 
-func (sdb *TypeStoreDataDB) CreateTable() {
+func (sdb *TypeStoreDataDB) CreateTable() bool {
 
-	if _, err := sdb.DBC.Pool.Exec(sdb.Ctx, constants.QuerySchema); err != nil {
+	ctx := context.Background()
+	conn, err := sdb.DBC.Pool.Acquire(ctx)
+	if err != nil {
 		constants.Logger.ErrorLog(err)
-		return
+		return false
+	}
+	defer conn.Release()
+
+	if _, err := conn.Exec(sdb.Ctx, constants.QuerySchema); err != nil {
+		conn.Release()
+		constants.Logger.ErrorLog(err)
+		return false
 	}
 
-	if _, err := sdb.DBC.Pool.Exec(sdb.Ctx, constants.QueryTable); err != nil {
+	if _, err := conn.Exec(sdb.Ctx, constants.QueryTable); err != nil {
+		conn.Release()
 		constants.Logger.ErrorLog(err)
+		return false
 	}
+	conn.Release()
+	ctx.Done()
+
+	return true
 }
 
 func (sdb *TypeStoreDataDB) SetMetric2DB(storedData encoding.ArrMetrics) error {
@@ -162,11 +182,13 @@ func (f *TypeStoreDataFile) ConnDB() *pgxpool.Pool {
 	return nil
 }
 
-func (f *TypeStoreDataFile) CreateTable() {
+func (f *TypeStoreDataFile) CreateTable() bool {
 	if _, err := os.Create(f.StoreFile); err != nil {
 		constants.Logger.ErrorLog(err)
+		return false
 	}
 
+	return true
 }
 
 func (f *TypeStoreDataFile) SetMetric2DB(storedData encoding.ArrMetrics) error {
