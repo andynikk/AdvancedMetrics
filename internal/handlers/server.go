@@ -1,3 +1,6 @@
+// Package handlers: работа с очередью сообщений.
+//
+// Роутер создан на основании библиотеки "github.com/gorilla/mux".
 package handlers
 
 import (
@@ -34,11 +37,8 @@ const (
 	CounterMetric
 )
 
-type HTMLParam struct {
-	Title       string
-	TextMetrics []string
-}
-
+// RepStore структура для настроек сервера, роутера и хранилище метрик.
+// Хранилище метрик защищено sync.Mutex
 type RepStore struct {
 	Config environment.ServerConfig
 	Router *mux.Router
@@ -54,6 +54,7 @@ func (et MetricError) String() string {
 	return [...]string{"Not error", "Error convert", "Error get type"}[et]
 }
 
+// NewRepStore инициализация хранилища, роутера, заполнение настроек.
 func NewRepStore(rs *RepStore) {
 
 	rs.MutexRepo = make(repository.MutexRepo)
@@ -83,6 +84,8 @@ func NewRepStore(rs *RepStore) {
 	}
 }
 
+// InitRoutersMux создание роутера.
+// Описание методов для обработки handlers сервера
 func InitRoutersMux(rs *RepStore) {
 
 	r := mux.NewRouter()
@@ -114,6 +117,9 @@ func InitRoutersMux(rs *RepStore) {
 	rs.Router = r
 }
 
+// Добавляет в хранилище метрику. Определяет тип метрики (gauge, counter).
+// В зависимости от типа добавляет нужное значение.
+// При успешном выполнении возвращает http-статус "ОК" (200)
 func (rs *RepStore) setValueInMap(metType string, metName string, metValue string) int {
 
 	switch metType {
@@ -201,6 +207,8 @@ func (rs *RepStore) SetValueInMapJSON(a []encoding.Metrics) int {
 
 }
 
+// HandlerGetValue Handler, который работает с GET запросом формата "/value/{metType}/{metName}"
+// Где metType наименование типа метрики, metName наименование метрики
 func (rs *RepStore) HandlerGetValue(rw http.ResponseWriter, rq *http.Request) {
 
 	metType := mux.Vars(rq)["metType"]
@@ -227,6 +235,9 @@ func (rs *RepStore) HandlerGetValue(rw http.ResponseWriter, rq *http.Request) {
 
 }
 
+// HandlerSetMetricaPOST Handler, который работает с POST запросом формата "/update/{metType}/{metName}/{metValue}".
+// Где metType наименование типа метрики, metName наименование метрики, metValue значение метрики.
+// Значение метрики записывается во временное хранилище метрик repository.MapMetrics
 func (rs *RepStore) HandlerSetMetricaPOST(rw http.ResponseWriter, rq *http.Request) {
 
 	rs.Lock()
@@ -239,6 +250,10 @@ func (rs *RepStore) HandlerSetMetricaPOST(rw http.ResponseWriter, rq *http.Reque
 	rw.WriteHeader(rs.setValueInMap(metType, metName, metValue))
 }
 
+// HandlerUpdateMetricJSON Handler, который работает с POST запросом формата "/update".
+// В теле получает JSON со значением метрики. Струтура JSON: encoding.Metrics.
+// Может принимать JSON в жатом виде gzip.
+// Сохраняет значение в физическое и временное хранилище.
 func (rs *RepStore) HandlerUpdateMetricJSON(rw http.ResponseWriter, rq *http.Request) {
 
 	var bodyJSON io.Reader
@@ -297,6 +312,9 @@ func (rs *RepStore) HandlerUpdateMetricJSON(rw http.ResponseWriter, rq *http.Req
 	}
 }
 
+// HandlerUpdatesMetricJSON Handler, который работает с POST запросом формата "/updates".
+// В теле получает массив JSON-значений со значением метрики. Струтура JSON: encoding.Metrics.
+// Может принимать JSON в жатом виде gzip. Сохраняет значение в физическое и временное хранилище.
 func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Request) {
 
 	var bodyJSON io.Reader
@@ -342,6 +360,9 @@ func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Re
 	}
 }
 
+// HandlerValueMetricaJSON Handler, который работает с POST запросом формата "/value".
+// В теле получает JSON с имененм типа и именем метрики. Струтура JSON: encoding.Metrics.
+// Может принимать JSON в жатом виде gzip. Возвращает значение метрики по типу и наименованию.
 func (rs *RepStore) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Request) {
 
 	var bodyJSON io.Reader
@@ -420,6 +441,10 @@ func (rs *RepStore) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Req
 	}
 }
 
+// HandlerPingDB Handler, который работает с GET запросом формата "/ping"
+// Handler проверяет соединение с физическим хранилищем метрик.
+// Физическое хранилище регулируется параметром среды "DATABASE_DSN" или флагом "d"
+// Если заполнено "DATABASE_DSN" или "d", то это база данных. Иначе файл.
 func (rs *RepStore) HandlerPingDB(rw http.ResponseWriter, rq *http.Request) {
 	defer rq.Body.Close()
 	mapTypeStore := rs.Config.TypeMetricsStorage
@@ -444,6 +469,8 @@ func (rs *RepStore) HandleFunc(rw http.ResponseWriter, rq *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 
+// HandlerGetAllMetrics Отрабатывает обращение к корневому узлу сервера (/).
+// Выводит на страницу список наименований и значений метрик.
 func (rs *RepStore) HandlerGetAllMetrics(rw http.ResponseWriter, rq *http.Request) {
 
 	arrMetricsAndValue := rs.MapMetrics.TextMetricsAndValue()
@@ -500,6 +527,8 @@ func (rs *RepStore) PrepareDataBU() encoding.ArrMetrics {
 	return storedData
 }
 
+// RestoreData При запуске сервера получает значения из фзического хранилища.
+// И заполняет временое хранилище RepStore {
 func (rs *RepStore) RestoreData() {
 
 	var arrMetricsAll []encoding.Metrics
@@ -518,6 +547,9 @@ func (rs *RepStore) RestoreData() {
 	rs.SetValueInMapJSON(arrMetricsAll)
 }
 
+// BackupData Сохраняет данные из временного хранилища RepStore в физическое.
+// Если параметр среды "RESTORE" тогда будет сохранятся один раз в n секунд.
+// Количество секунд регулируется параметром среды "STORE_INTERVAL" или флагом "i"
 func (rs *RepStore) BackupData() {
 
 	ctx, cancelFunc := context.WithCancel(context.Background())

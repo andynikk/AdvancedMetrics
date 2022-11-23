@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -15,11 +14,18 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/postgresql"
 )
 
+// TypeStoreDataDB Структура хранения настроек БД
+// DBC: конект с базой данных
+// Ctx: контекст на момент создания
+// DBDsn: строка соединения с базой данных
 type TypeStoreDataDB struct {
 	DBC   postgresql.DBConnector
 	Ctx   context.Context
 	DBDsn string
 }
+
+// TypeStoreDataFile Структура хранения настроек файла
+// StoreFile путь к файлу хранения метрик
 type TypeStoreDataFile struct {
 	StoreFile string
 }
@@ -31,9 +37,9 @@ type TypeStoreData interface {
 	GetMetric() ([]encoding.Metrics, error)
 	CreateTable() bool
 	ConnDB() *pgxpool.Pool
-	SetMetric2DB(storedData encoding.ArrMetrics) error
 }
 
+// WriteMetric Запись метрик в базу данных
 func (sdb *TypeStoreDataDB) WriteMetric(storedData encoding.ArrMetrics) {
 	dataBase := sdb.DBC
 	if err := dataBase.SetMetric2DB(storedData); err != nil {
@@ -41,6 +47,7 @@ func (sdb *TypeStoreDataDB) WriteMetric(storedData encoding.ArrMetrics) {
 	}
 }
 
+// GetMetric Получение метрик из базы данных
 func (sdb *TypeStoreDataDB) GetMetric() ([]encoding.Metrics, error) {
 	var arrMatrics []encoding.Metrics
 
@@ -79,10 +86,12 @@ func (sdb *TypeStoreDataDB) GetMetric() ([]encoding.Metrics, error) {
 	return arrMatrics, nil
 }
 
+// ConnDB Возвращает соединение с базой данных
 func (sdb *TypeStoreDataDB) ConnDB() *pgxpool.Pool {
 	return sdb.DBC.Pool
 }
 
+// CreateTable Проверка и создание, если таковых нет, таблиц в базе данных
 func (sdb *TypeStoreDataDB) CreateTable() bool {
 
 	ctx := context.Background()
@@ -110,50 +119,9 @@ func (sdb *TypeStoreDataDB) CreateTable() bool {
 	return true
 }
 
-func (sdb *TypeStoreDataDB) SetMetric2DB(storedData encoding.ArrMetrics) error {
-
-	DB, err := postgresql.NewClient(sdb.Ctx, "postgresql://postgres:101650@localhost:5433/yapracticum")
-	if err != nil {
-		return errors.New("ошибка выборки данных в БД")
-	}
-	for _, data := range storedData {
-		rows, err := DB.Query(sdb.Ctx, constants.QuerySelectWithWhereTemplate, data.ID, data.MType)
-		if err != nil {
-			return errors.New("ошибка выборки данных в БД")
-		}
-
-		dataValue := float64(0)
-		if data.Value != nil {
-			dataValue = *data.Value
-		}
-		dataDelta := int64(0)
-		if data.Delta != nil {
-			dataDelta = *data.Delta
-		}
-
-		insert := true
-		if rows.Next() {
-			insert = false
-		}
-		rows.Close()
-
-		if insert {
-			if _, err := DB.Exec(sdb.Ctx, constants.QueryInsertTemplate, data.ID, data.MType, dataValue, dataDelta, ""); err != nil {
-				constants.Logger.ErrorLog(err)
-				return errors.New(err.Error())
-			}
-		} else {
-			if _, err := DB.Exec(sdb.Ctx, constants.QueryUpdateTemplate, data.ID, data.MType, dataValue, dataDelta, ""); err != nil {
-				constants.Logger.ErrorLog(err)
-				return errors.New("ошибка обновления данных в БД")
-			}
-		}
-	}
-	return nil
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// WriteMetric Запись метрик в файл
 func (f *TypeStoreDataFile) WriteMetric(storedData encoding.ArrMetrics) {
 	arrJSON, err := json.Marshal(storedData)
 	if err != nil {
@@ -166,6 +134,7 @@ func (f *TypeStoreDataFile) WriteMetric(storedData encoding.ArrMetrics) {
 	}
 }
 
+// GetMetric Получение метрик из файла
 func (f *TypeStoreDataFile) GetMetric() ([]encoding.Metrics, error) {
 	res, err := ioutil.ReadFile(f.StoreFile)
 	if err != nil {
@@ -179,10 +148,12 @@ func (f *TypeStoreDataFile) GetMetric() ([]encoding.Metrics, error) {
 	return arrMatric, nil
 }
 
+// ConnDB Возвращает с файлом. Для файла не используется. Возвращает nil
 func (f *TypeStoreDataFile) ConnDB() *pgxpool.Pool {
 	return nil
 }
 
+// CreateTable Проверка и создание, если нет, файла для хранения метрик
 func (f *TypeStoreDataFile) CreateTable() bool {
 	if _, err := os.Create(f.StoreFile); err != nil {
 		constants.Logger.ErrorLog(err)
@@ -190,11 +161,4 @@ func (f *TypeStoreDataFile) CreateTable() bool {
 	}
 
 	return true
-}
-
-func (f *TypeStoreDataFile) SetMetric2DB(storedData encoding.ArrMetrics) error {
-	for _, val := range storedData {
-		constants.Logger.InfoLog(fmt.Sprintf("очень странно, но этого сообщения не должно быть %s", val.ID))
-	}
-	return nil
 }

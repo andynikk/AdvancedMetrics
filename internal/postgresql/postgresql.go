@@ -1,3 +1,4 @@
+// Package postgresql работает непосредственно с базой данных
 package postgresql
 
 import (
@@ -5,23 +6,18 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 
 	"github.com/andynikk/advancedmetrics/internal/constants"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
 )
 
-type DataBase struct {
-	DB  pgx.Conn
-	Ctx context.Context
-}
-
 type Context struct {
 	Ctx        context.Context
 	CancelFunc context.CancelFunc
 }
 
+// DBConnector структура хранения конекта с базой данной
 type DBConnector struct {
 	Pool    *pgxpool.Pool
 	Context Context
@@ -39,6 +35,9 @@ type arrTransitMetrics struct {
 	Arr []transitMetrics
 }
 
+// PoolDB создает коннект с базой данных.
+// Хранит коннект (pgxpool.Connect) в настройках.
+// Из конекта создает Pool, при необходимости.
 func PoolDB(dsn string) (*DBConnector, error) {
 	if dsn == "" {
 		return new(DBConnector), errors.New("пустой путь к базе")
@@ -59,19 +58,11 @@ func PoolDB(dsn string) (*DBConnector, error) {
 	return &dbc, nil
 }
 
-func NewClient(ctx context.Context, dsn string) (*pgx.Conn, error) {
-	if dsn == "" {
-		return nil, errors.New("пустой путь к базе")
-	}
-
-	db, err := pgx.Connect(ctx, dsn)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
-}
-
+// SetMetric2DB Добавляет метрики в БД.
+// Из массива (тип encoding.ArrMetrics) создает запрос к БД по имени и типу метрики.
+// По найденным метрикам создает набор SQL-запросов update
+// По не найденным метрикам создает набор SQL-запросов insert
+// Далает вызов БД один раз, сразу по всем update &  insert
 func (DataBase *DBConnector) SetMetric2DB(storedData encoding.ArrMetrics) error {
 
 	ctx := context.Background()
@@ -144,7 +135,7 @@ func (DataBase *DBConnector) SetMetric2DB(storedData encoding.ArrMetrics) error 
 			sDelta = fmt.Sprintf("%d", *val.Delta)
 		}
 
-		if ok := updArrTM.Find(val.MType, val.ID); ok {
+		if ok := updArrTM.find(val.MType, val.ID); ok {
 			if txtQueryUpdata != "" {
 				txtQueryUpdata = txtQueryUpdata + "\n"
 			}
@@ -178,7 +169,7 @@ func (DataBase *DBConnector) SetMetric2DB(storedData encoding.ArrMetrics) error 
 	return nil
 }
 
-func (atm arrTransitMetrics) Find(mtype string, id string) bool {
+func (atm arrTransitMetrics) find(mtype string, id string) bool {
 	for _, val := range atm.Arr {
 		if val.MType == mtype && val.ID == id {
 			return true
