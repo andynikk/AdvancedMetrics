@@ -85,6 +85,5 @@ func init() {
 		return
 	}
 	rs.MutexRepo["TestGauge"] = &valG
-
 	InitRoutersMux(&rs)
 }
