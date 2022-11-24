@@ -1,3 +1,4 @@
+// Start of the service for getting metrics.
 package main
 
 import (
@@ -15,6 +16,8 @@ type server struct {
 	storege handlers.RepStore
 }
 
+// Shutdown working out the service stop.
+// We save the current values of metrics in the database.
 func Shutdown(rs *handlers.RepStore) {
 	rs.Lock()
 	defer rs.Unlock()

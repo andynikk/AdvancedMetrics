@@ -1,3 +1,9 @@
+// Package repository работает с хранением метрик.
+//
+// Разделен на две части.
+// На хранение метрик во временном хранилище.
+// На хранение в физическом хранилище (БД и/или файл).
+// Метрики хранятся в двух типах.
 package repository
 
 import (
@@ -10,7 +16,10 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/encoding"
 )
 
+// Gauge тип метрики хранения на базе float64
 type Gauge float64
+
+// Counter тип метрики хранения на базе float64
 type Counter int64
 
 type MutexRepo map[string]Metric
@@ -27,15 +36,19 @@ type Metric interface {
 	GetMetrics(id string, mType string, hashKey string) encoding.Metrics
 }
 
+// String возаращает значение метрики строкой
 func (g *Gauge) String() string {
 
 	return fmt.Sprintf("%g", *g)
 }
 
+// Type возаращает тип значения метрики строкой
 func (g *Gauge) Type() string {
 	return "gauge"
 }
 
+// GetMetrics Сохраняет метрику в формате encoding.Metrics.
+// И возращает ее в вызываемую процедуру.
 func (g *Gauge) GetMetrics(mType string, id string, hashKey string) encoding.Metrics {
 
 	value := float64(*g)
@@ -47,12 +60,14 @@ func (g *Gauge) GetMetrics(mType string, id string, hashKey string) encoding.Met
 	return mt
 }
 
+// Set Устанавливает значение метрики в тип Gauge из типа float64
 func (g *Gauge) Set(v encoding.Metrics) {
 
 	*g = Gauge(*v.Value)
 
 }
 
+// SetFromText Устанавливает значение метрики в тип Gauge из типа string
 func (g *Gauge) SetFromText(metValue string) bool {
 
 	predVal, err := strconv.ParseFloat(metValue, 64)
@@ -69,11 +84,13 @@ func (g *Gauge) SetFromText(metValue string) bool {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Set Устанавливает значение метрики в тип Counter из типа int64
 func (c *Counter) Set(v encoding.Metrics) {
 
 	*c = *c + Counter(*v.Delta)
 }
 
+// SetFromText Устанавливает значение метрики в тип Counter из типа string
 func (c *Counter) SetFromText(metValue string) bool {
 
 	predVal, err := strconv.ParseInt(metValue, 10, 64)
@@ -88,11 +105,14 @@ func (c *Counter) SetFromText(metValue string) bool {
 
 }
 
+// String возаращает значение метрики строкой
 func (c *Counter) String() string {
 
 	return fmt.Sprintf("%d", *c)
 }
 
+// GetMetrics Сохраняет метрику в формате encoding.Metrics.
+// И возращает ее в вызываемую процедуру.
 func (c *Counter) GetMetrics(mType string, id string, hashKey string) encoding.Metrics {
 
 	delta := int64(*c)
@@ -105,6 +125,7 @@ func (c *Counter) GetMetrics(mType string, id string, hashKey string) encoding.M
 	return mt
 }
 
+// Type возаращает тип значения метрики строкой
 func (c *Counter) Type() string {
 	return "counter"
 }
