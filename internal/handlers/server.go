@@ -111,7 +111,9 @@ func InitRoutersMux(rs *RepStore) {
 	r.Handle("/debug/goroutine", pprof.Handler("goroutine"))
 	r.Handle("/debug/heap", pprof.Handler("heap"))
 	r.Handle("/debug/threadcreate", pprof.Handler("threadcreate"))
+	//r.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
 	r.Handle("/debug/allocs", pprof.Handler("allocs"))
+	r.Handle("/debug/mutex", pprof.Handler("mutex"))
 	r.Handle("/debug/mutex", pprof.Handler("mutex"))
 
 	rs.Router = r

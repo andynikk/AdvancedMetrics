@@ -10,15 +10,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/andynikk/advancedmetrics/internal/constants"
+	"github.com/andynikk/advancedmetrics/internal/environment"
+	"github.com/andynikk/advancedmetrics/internal/postgresql"
 	"github.com/gorilla/mux"
 
 	"github.com/andynikk/advancedmetrics/internal/compression"
-	"github.com/andynikk/advancedmetrics/internal/constants"
 	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
-	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/handlers"
-	"github.com/andynikk/advancedmetrics/internal/postgresql"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 
@@ -35,6 +35,25 @@ func TestFuncServer(t *testing.T) {
 		if len(messageRaz) != 3 {
 			t.Errorf("The string (%s) was incorrectly decomposed into an array", postStr)
 		}
+	})
+
+	t.Run("Checking connect DB", func(t *testing.T) {
+		ctx := context.Background()
+
+		sc := environment.SetConfigServer()
+		dbConn, err := postgresql.PoolDB(sc.DatabaseDsn)
+		if err != nil {
+			t.Errorf("Error create DB connection")
+		}
+		t.Run("Checking create DB table", func(t *testing.T) {
+			mapTypeStore := sc.TypeMetricsStorage
+			mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataDB{
+				DBC: *dbConn, Ctx: ctx, DBDsn: sc.DatabaseDsn,
+			}
+			if ok := mapTypeStore[constants.MetricsStorageDB.String()].CreateTable(); !ok {
+				t.Errorf("Error create DB table")
+			}
+		})
 	})
 
 	t.Run("Checking handlers", func(t *testing.T) {
@@ -220,36 +239,6 @@ func TestFuncServer(t *testing.T) {
 			if erorr {
 				t.Errorf("Error checking Hash SHA 256")
 			}
-		})
-	})
-
-	t.Run("Checking connect DB", func(t *testing.T) {
-		ctx := context.Background()
-
-		sc := environment.SetConfigServer()
-		dbConn, err := postgresql.PoolDB(sc.DatabaseDsn)
-		if err != nil {
-			t.Errorf("Error create DB connection")
-		}
-		t.Run("Checking create DB table", func(t *testing.T) {
-			mapTypeStore := sc.TypeMetricsStorage
-			mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataDB{
-				DBC: *dbConn, Ctx: ctx, DBDsn: sc.DatabaseDsn,
-			}
-			if ok := mapTypeStore[constants.MetricsStorageDB.String()].CreateTable(); !ok {
-				t.Errorf("Error create DB table")
-			}
-
-			//t.Run("Checking update data", func(t *testing.T) {
-			//	arrM := testArray("")
-			//	mapTypeStore := sc.TypeMetricsStorage
-			//	mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataDB{
-			//		DBC: *dbConn, Ctx: ctx, DBDsn: sc.DatabaseDsn,
-			//	}
-			//	if ok := mapTypeStore[constants.MetricsStorageDB.String()].CreateTable(); !ok {
-			//		t.Errorf("Error create DB table")
-			//	}
-			//})
 		})
 	})
 }

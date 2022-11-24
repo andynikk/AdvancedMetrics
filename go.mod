@@ -11,7 +11,6 @@ require (
 )
 
 require (
-	github.com/go-chi/chi/v5 v5.0.7 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.13.0 // indirect
