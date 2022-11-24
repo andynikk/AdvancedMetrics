@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"runtime"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 
@@ -137,7 +137,6 @@ func BenchmarkSendMetrics(b *testing.B) {
 			defer wg.Done()
 			agent.goPost2Server(allMetrics)
 		}()
-		//agent.goPost2Server(allMetrics)
 	}
 	wg.Wait()
 }
