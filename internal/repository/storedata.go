@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"io/ioutil"
 	"os"
+
+	"github.com/jackc/pgx/v4/pgxpool"
 
 	"github.com/andynikk/advancedmetrics/internal/constants"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
