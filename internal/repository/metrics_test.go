@@ -8,20 +8,20 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 
-func ExampleGauge_String() {
-	var g repository.Gauge = 0.01
-	fmt.Print(g.String())
-
-	// Output:
-	// 0.01
-}
-
 func ExampleGauge_Type() {
 	var g repository.Gauge = 0.01
 	fmt.Print(g.Type())
 
 	// Output:
 	// gauge
+}
+
+func ExampleGauge_String() {
+	var g repository.Gauge = 0.01
+	fmt.Print(g.String())
+
+	// Output:
+	// 0.01
 }
 
 func ExampleGauge_GetMetrics() {

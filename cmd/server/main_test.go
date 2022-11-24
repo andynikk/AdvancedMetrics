@@ -10,15 +10,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andynikk/advancedmetrics/internal/constants"
-	"github.com/andynikk/advancedmetrics/internal/environment"
-	"github.com/andynikk/advancedmetrics/internal/postgresql"
 	"github.com/gorilla/mux"
 
 	"github.com/andynikk/advancedmetrics/internal/compression"
+	"github.com/andynikk/advancedmetrics/internal/constants"
 	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
+	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/handlers"
+	"github.com/andynikk/advancedmetrics/internal/postgresql"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 

@@ -106,12 +106,10 @@ func InitRoutersMux(rs *RepStore) {
 	r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	r.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
-	//r.Handle("/debug/pprof/profile", pprof.Handler("profile"))
 	r.Handle("/debug/block", pprof.Handler("block"))
 	r.Handle("/debug/goroutine", pprof.Handler("goroutine"))
 	r.Handle("/debug/heap", pprof.Handler("heap"))
 	r.Handle("/debug/threadcreate", pprof.Handler("threadcreate"))
-	//r.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
 	r.Handle("/debug/allocs", pprof.Handler("allocs"))
 	r.Handle("/debug/mutex", pprof.Handler("mutex"))
 	r.Handle("/debug/mutex", pprof.Handler("mutex"))
@@ -477,6 +475,7 @@ func (rs *RepStore) HandlerGetAllMetrics(rw http.ResponseWriter, rq *http.Reques
 
 	arrMetricsAndValue := rs.MapMetrics.TextMetricsAndValue()
 
+	var strMetrics string
 	content := `<!DOCTYPE html>
 				<html>
 				<head>
@@ -489,6 +488,10 @@ func (rs *RepStore) HandlerGetAllMetrics(rw http.ResponseWriter, rq *http.Reques
 				`
 	for _, val := range arrMetricsAndValue {
 		content = content + `<li><b>` + val + `</b></li>` + "\n"
+		if strMetrics != "" {
+			strMetrics = strMetrics + ";"
+		}
+		strMetrics = strMetrics + val
 	}
 	content = content + `</ul>
 						</body>
@@ -512,11 +515,11 @@ func (rs *RepStore) HandlerGetAllMetrics(rw http.ResponseWriter, rq *http.Reques
 	}
 
 	rw.Header().Add("Content-Type", "text/html")
+	rw.Header().Add("Metrics-Val", strMetrics)
 	if _, err := rw.Write(bodyBate); err != nil {
 		constants.Logger.ErrorLog(err)
 		return
 	}
-
 	rw.WriteHeader(http.StatusOK)
 }
 
