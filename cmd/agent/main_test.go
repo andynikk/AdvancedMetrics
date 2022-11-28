@@ -75,6 +75,7 @@ func TestFuncAgen(t *testing.T) {
 		}
 
 	})
+
 	t.Run("Checking fillings the metrics", func(t *testing.T) {
 		agent.fillMetric(&mem)
 		allMetrics := make(emtyArrMetrics, 0)
