@@ -237,7 +237,7 @@ func (a *agent) MakeRequest() {
 func main() {
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	agent := agent{
+	a := agent{
 		cfg: environment.SetConfigAgent(),
 		data: data{
 			pollCount:    0,
@@ -249,9 +249,9 @@ func main() {
 		},
 	}
 
-	go agent.metrixScan()
-	go agent.metrixOtherScan()
-	go agent.MakeRequest()
+	go a.metrixScan()
+	go a.metrixOtherScan()
+	go a.MakeRequest()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)

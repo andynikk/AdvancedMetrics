@@ -137,8 +137,8 @@ func TestFuncAgen(t *testing.T) {
 }
 
 func BenchmarkSendMetrics(b *testing.B) {
-	agent := agent{}
-	agent.cfg.Address = "localhost:8080"
+	a := agent{}
+	a.cfg.Address = "localhost:8080"
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < 10000; i++ {
@@ -155,7 +155,7 @@ func BenchmarkSendMetrics(b *testing.B) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			agent.goPost2Server(allMetrics)
+			a.goPost2Server(allMetrics)
 		}()
 	}
 	wg.Wait()
