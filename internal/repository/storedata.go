@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -128,7 +127,7 @@ func (f *TypeStoreDataFile) WriteMetric(storedData encoding.ArrMetrics) {
 		constants.Logger.ErrorLog(err)
 		return
 	}
-	if err := ioutil.WriteFile(f.StoreFile, arrJSON, 0777); err != nil {
+	if err := os.WriteFile(f.StoreFile, arrJSON, 0777); err != nil {
 		constants.Logger.ErrorLog(err)
 		return
 	}
@@ -136,7 +135,7 @@ func (f *TypeStoreDataFile) WriteMetric(storedData encoding.ArrMetrics) {
 
 // GetMetric Получение метрик из файла
 func (f *TypeStoreDataFile) GetMetric() ([]encoding.Metrics, error) {
-	res, err := ioutil.ReadFile(f.StoreFile)
+	res, err := os.ReadFile(f.StoreFile)
 	if err != nil {
 		return nil, err
 	}

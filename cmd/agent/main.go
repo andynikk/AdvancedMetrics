@@ -170,14 +170,17 @@ func (a *agent) Post2Server(allMterics []byte) error {
 	return nil
 }
 
-func (a *agent) goPost2Server(allMetrics emtyArrMetrics) {
+func (a *agent) goPost2Server(allMetrics emtyArrMetrics) error {
 	gziparrMetrics, err := allMetrics.prepareMetrics()
 	if err != nil {
 		constants.Logger.ErrorLog(err)
+		return err
 	}
 	if err := a.Post2Server(gziparrMetrics); err != nil {
 		constants.Logger.ErrorLog(err)
+		return err
 	}
+	return nil
 }
 
 func (a *agent) MakeRequest() {

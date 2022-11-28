@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -37,10 +38,14 @@ func TestFuncServer(t *testing.T) {
 		}
 	})
 
+	rp := new(handlers.RepStore)
+	rp.MutexRepo = make(repository.MutexRepo)
+	handlers.InitRoutersMux(rp)
+	sc := environment.SetConfigServer()
+
 	t.Run("Checking connect DB", func(t *testing.T) {
 		ctx := context.Background()
 
-		sc := environment.SetConfigServer()
 		dbConn, err := postgresql.PoolDB(sc.DatabaseDsn)
 		if err != nil {
 			t.Errorf("Error create DB connection")
@@ -53,13 +58,154 @@ func TestFuncServer(t *testing.T) {
 			if ok := mapTypeStore[constants.MetricsStorageDB.String()].CreateTable(); !ok {
 				t.Errorf("Error create DB table")
 			}
+			t.Run("Checking handlers /ping GET", func(t *testing.T) {
+				ts := httptest.NewServer(rp.Router)
+				defer ts.Close()
+
+				mapTypeStore := sc.TypeMetricsStorage
+				if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
+					t.Errorf("Error handlers /ping GET")
+					return
+				}
+
+				if mapTypeStore[constants.MetricsStorageDB.String()].ConnDB() == nil {
+					t.Errorf("Error handlers /ping GET")
+					return
+				}
+			})
+		})
+	})
+
+	t.Run("Checking metric methods", func(t *testing.T) {
+		t.Run(`Checking method "String" type "Counter"`, func(t *testing.T) {
+			var c repository.Counter = 58
+			if c.String() != "58" {
+				t.Errorf(`Error method "String" for Counter `)
+				return
+			}
+		})
+		t.Run(`Checking method "String" type "Gauge"`, func(t *testing.T) {
+			var c repository.Gauge = 0.001
+			if c.String() != "0.001" {
+				t.Errorf(`Error method "String" for Counter `)
+				return
+			}
+		})
+		t.Run(`Checking method "GetMetrics" type "Counter"`, func(t *testing.T) {
+			mType := "counter"
+			id := "TestCounter"
+			hashKey := "TestHash"
+
+			var c repository.Counter
+			c = 58
+
+			mt := c.GetMetrics(mType, id, hashKey)
+			msg := fmt.Sprintf("MType: %s, ID: %s, Value: %v, Delta: %d, Hash: %s",
+				mt.MType, mt.ID, 0, *mt.Delta, mt.Hash)
+
+			if msg != "MType: counter, ID: TestCounter, Value: 0, Delta: 58, Hash: 29bd8e4bde7ec6302393fe3f7954895a65f4d4b22372d00a35fc1adbcc2ec239" {
+				t.Errorf(`method "GetMetrics" type "Counter"`)
+				return
+			}
+		})
+		t.Run(`Checking method "GetMetrics" type "Gauge"`, func(t *testing.T) {
+			mType := "gauge"
+			id := "TestGauge"
+			hashKey := "TestHash"
+
+			var g repository.Gauge
+			g = 0.01
+
+			mt := g.GetMetrics(mType, id, hashKey)
+			msg := fmt.Sprintf("MType: %s, ID: %s, Value: %f, Delta: %d, Hash: %s",
+				mt.MType, mt.ID, *mt.Value, 0, mt.Hash)
+			if msg != "MType: gauge, ID: TestGauge, Value: 0.010000, Delta: 0, Hash: 4e5d8a0e257dd12355b15f730591dddd9e45e18a6ef67460a58f20edc12c9465" {
+				t.Errorf(`method "GetMetrics" type "Counter"`)
+				return
+			}
+		})
+		t.Run(`Checking method "Set" type "Counter"`, func(t *testing.T) {
+			var c repository.Counter
+			var i int64 = 58
+			v := encoding.Metrics{
+				ID:    "",
+				MType: "",
+				Delta: &i,
+				Hash:  "",
+			}
+			c.Set(v)
+
+			if c != 58 {
+				t.Errorf(`Error method "Set" for Counter `)
+				return
+			}
+		})
+		t.Run(`Checking method "Set" type "Gauge"`, func(t *testing.T) {
+			var g repository.Gauge
+			var f float64 = 0.01
+
+			v := encoding.Metrics{
+				ID:    "",
+				MType: "",
+				Value: &f,
+				Hash:  "",
+			}
+			g.Set(v)
+			if g != 0.01 {
+				t.Errorf(`Error method "Set" for Counter `)
+				return
+			}
+		})
+		t.Run(`Checking method "Type" type "Counter"`, func(t *testing.T) {
+			var c repository.Counter = 58
+			if c.Type() != "counter" {
+				t.Errorf(`Error method "Type" for Counter `)
+			}
+		})
+		t.Run(`Checking method "Type" type "Gauge"`, func(t *testing.T) {
+			var g repository.Gauge = 0.001
+			if g.Type() != "gauge" {
+				t.Errorf(`Error method "Type" for Counter `)
+			}
+		})
+		t.Run(`Checking method "SetFromText" type "Counter"`, func(t *testing.T) {
+			metValue := "58"
+			c := repository.Gauge(0)
+			c.SetFromText(metValue)
+			if c != 58 {
+				t.Errorf(`Error method "SetFromText" for Counter `)
+			}
+		})
+		t.Run(`Checking method "SetFromText" type "Gauge"`, func(t *testing.T) {
+			metValue := "0.01"
+			g := repository.Gauge(0)
+			g.SetFromText(metValue)
+			if g != 0.01 {
+				t.Errorf(`Error method "SetFromText" for Counter `)
+			}
+		})
+
+		t.Run(`Checking method PrepareDataBU`, func(t *testing.T) {
+			valG := repository.Gauge(0)
+			if ok := valG.SetFromText("0.001"); !ok {
+				return
+			}
+			rp.MutexRepo["TestGauge"] = &valG
+
+			valC := repository.Counter(0)
+			if ok := valC.SetFromText("58"); !ok {
+				return
+			}
+			rp.MutexRepo["TestCounter"] = &valC
+
+			data := rp.PrepareDataBU()
+			if len(data) != 2 {
+				t.Errorf(`Error method "PrepareDataBU"`)
+			}
 		})
 	})
 
 	t.Run("Checking handlers", func(t *testing.T) {
-		rp := new(handlers.RepStore)
-		rp.MutexRepo = make(repository.MutexRepo)
-		handlers.InitRoutersMux(rp)
 		ts := httptest.NewServer(rp.Router)
 		defer ts.Close()
 
@@ -79,6 +225,15 @@ func TestFuncServer(t *testing.T) {
 				}
 			})
 		})
+		//t.Run("Checking handler /updates POST/", func(t *testing.T) {
+		//
+		//	resp := testRequest(t, ts, http.MethodPost, "/updates", nil)
+		//	defer resp.Body.Close()
+		//
+		//	if resp.StatusCode != http.StatusOK {
+		//		t.Errorf("Error handler //update/{metType}/{metName}/{metValue}/")
+		//	}
+		//})
 		t.Run("Checking handler /update POST/", func(t *testing.T) {
 			testA := testArray("")
 			arrMetrics, err := json.MarshalIndent(testA, "", " ")
