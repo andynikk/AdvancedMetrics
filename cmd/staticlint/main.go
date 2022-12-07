@@ -10,7 +10,10 @@
 //
 // публичные анализаторы commentmap, tagalyzer
 //
+// Создание бинарного файла анализатора "%patchapp%\go build ./cmd/staticlint/."
+//
 // Запускается из коммандной строки "%patchapp%\staticlint.exe ./..."
+//
 // Список анализаторов можно получить коммандой %patchapp%\staticlint.exe -help
 //
 // golang.org/x/tools/go/analysis
@@ -122,11 +125,14 @@
 // "github.com/andynikk/advancedmetrics/internal/banosexit"
 //
 // BanOsExit - Ban used os.Exit()
-package staticlint
+package main
 
 import (
 	"strings"
 
+	"github.com/andynikk/advancedmetrics/internal/banosexit"
+	"github.com/gostaticanalysis/comment/passes/commentmap"
+	"github.com/salihzain/tagalyzer"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/multichecker"
 	"golang.org/x/tools/go/analysis/passes/asmdecl"
@@ -162,11 +168,6 @@ import (
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/stylecheck"
-
-	"github.com/gostaticanalysis/comment/passes/commentmap"
-	"github.com/salihzain/tagalyzer"
-
-	"github.com/andynikk/advancedmetrics/internal/banosexit"
 )
 
 func main() {

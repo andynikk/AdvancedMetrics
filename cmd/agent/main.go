@@ -46,6 +46,10 @@ type agent struct {
 	data
 }
 
+var buildVersion = "N/A"
+var buildDate = "N/A"
+var buildCommit = "N/A"
+
 func (eam *emtyArrMetrics) prepareMetrics() ([]byte, error) {
 	arrMetrics, err := json.MarshalIndent(eam, "", " ")
 	if err != nil {
@@ -235,6 +239,10 @@ func (a *agent) MakeRequest() {
 }
 
 func main() {
+
+	fmt.Println(fmt.Sprintf("Build version: <%s>", buildVersion))
+	fmt.Println(fmt.Sprintf("Build date: <%s>", buildDate))
+	fmt.Println(fmt.Sprintf("Build commit: <%s>", buildCommit))
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	a := agent{

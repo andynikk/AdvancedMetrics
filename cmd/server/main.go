@@ -16,6 +16,10 @@ type server struct {
 	storege handlers.RepStore
 }
 
+var buildVersion = "N/A"
+var buildDate = "N/A"
+var buildCommit = "N/A"
+
 // Shutdown working out the service stop.
 // We save the current values of metrics in the database.
 func Shutdown(rs *handlers.RepStore) {
@@ -29,6 +33,10 @@ func Shutdown(rs *handlers.RepStore) {
 }
 
 func main() {
+
+	fmt.Println(fmt.Sprintf("Build version: <%s>", buildVersion))
+	fmt.Println(fmt.Sprintf("Build date: <%s>", buildDate))
+	fmt.Println(fmt.Sprintf("Build commit: <%s>", buildCommit))
 
 	server := new(server)
 	handlers.NewRepStore(&server.storege)
