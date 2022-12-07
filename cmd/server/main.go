@@ -49,10 +49,8 @@ func main() {
 			return
 		}
 	}()
-
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	<-stop
 	Shutdown(&server.storege)
-
 }

@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/pprof"
 	"strings"
@@ -261,7 +260,7 @@ func (rs *RepStore) HandlerUpdateMetricJSON(rw http.ResponseWriter, rq *http.Req
 	contentEncoding := rq.Header.Get("Content-Encoding")
 	bodyJSON = rq.Body
 	if strings.Contains(contentEncoding, "gzip") {
-		bytBody, err := ioutil.ReadAll(rq.Body)
+		bytBody, err := io.ReadAll(rq.Body)
 		if err != nil {
 			constants.Logger.InfoLog(fmt.Sprintf("$$ 1 %s", err.Error()))
 			http.Error(rw, "Ошибка получения Content-Encoding", http.StatusInternalServerError)
@@ -324,7 +323,7 @@ func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Re
 
 	bodyJSON = rq.Body
 	if strings.Contains(contentEncoding, "gzip") {
-		bytBody, err := ioutil.ReadAll(rq.Body)
+		bytBody, err := io.ReadAll(rq.Body)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			http.Error(rw, "Ошибка получения Content-Encoding", http.StatusInternalServerError)
@@ -341,7 +340,7 @@ func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Re
 		bodyJSON = bytes.NewReader(arrBody)
 	}
 
-	respByte, err := ioutil.ReadAll(bodyJSON)
+	respByte, err := io.ReadAll(bodyJSON)
 	if err != nil {
 		constants.Logger.ErrorLog(err)
 		http.Error(rw, "Ошибка распаковки", http.StatusInternalServerError)
@@ -372,7 +371,7 @@ func (rs *RepStore) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Req
 	contentEncoding := rq.Header.Get("Content-Encoding")
 	if strings.Contains(contentEncoding, "gzip") {
 		constants.Logger.InfoLog("-- метрика с агента gzip (value)")
-		bytBody, err := ioutil.ReadAll(rq.Body)
+		bytBody, err := io.ReadAll(rq.Body)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			http.Error(rw, "Ошибка получения Content-Encoding", http.StatusInternalServerError)

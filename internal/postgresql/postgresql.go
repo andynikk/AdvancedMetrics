@@ -108,6 +108,10 @@ func (DataBase *DBConnector) SetMetric2DB(storedData encoding.ArrMetrics) error 
 
 	var updTM []transitMetrics
 	rows, err := conn.Query(ctx, txtQuery)
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+		return err
+	}
 	for rows.Next() {
 		var d encoding.Metrics
 

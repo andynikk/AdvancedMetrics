@@ -170,14 +170,17 @@ func (a *agent) Post2Server(allMterics []byte) error {
 	return nil
 }
 
-func (a *agent) goPost2Server(allMetrics emtyArrMetrics) {
+func (a *agent) goPost2Server(allMetrics emtyArrMetrics) error {
 	gziparrMetrics, err := allMetrics.prepareMetrics()
 	if err != nil {
 		constants.Logger.ErrorLog(err)
+		return err
 	}
 	if err := a.Post2Server(gziparrMetrics); err != nil {
 		constants.Logger.ErrorLog(err)
+		return err
 	}
+	return nil
 }
 
 func (a *agent) MakeRequest() {
@@ -234,7 +237,7 @@ func (a *agent) MakeRequest() {
 func main() {
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	agent := agent{
+	a := agent{
 		cfg: environment.SetConfigAgent(),
 		data: data{
 			pollCount:    0,
@@ -246,9 +249,9 @@ func main() {
 		},
 	}
 
-	go agent.metrixScan()
-	go agent.metrixOtherScan()
-	go agent.MakeRequest()
+	go a.metrixScan()
+	go a.metrixOtherScan()
+	go a.MakeRequest()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)

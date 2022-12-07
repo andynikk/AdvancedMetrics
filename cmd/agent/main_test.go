@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/andynikk/advancedmetrics/internal/constants"
+	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
@@ -52,21 +54,6 @@ func TestFuncAgen(t *testing.T) {
 				//t.Errorf("Error creating a submission line", string(resultMS), realResult)
 				t.Errorf("Error creating a submission line (%s)", argErr)
 			}
-
-			//t.Run("Creating a submission line", func(t *testing.T) {
-			//
-			//	r := strings.NewReader(resultMassage)
-			//	resp, err := http.Post("http://localhost:8080", "text/plain", r)
-			//
-			//	if err != nil {
-			//		t.Errorf("Error sending a POST message (%s)", err.Error())
-			//	}
-			//
-			//	if resp.Status != "200 OK" {
-			//		t.Errorf("Incorrect jndtnf status (%s)", err.Error())
-			//	}
-			//	resp.Body.Close()
-			//})
 		})
 	})
 
@@ -88,8 +75,41 @@ func TestFuncAgen(t *testing.T) {
 		}
 
 	})
+	t.Run("Checking fillings the metrics", func(t *testing.T) {
+		agent.fillMetric(&mem)
+		allMetrics := make(emtyArrMetrics, 0)
+		i := 0
+		tempMetricsGauge := &agent.data.metricsGauge
+		for key, val := range *tempMetricsGauge {
+			valFloat64 := float64(val)
 
-	agent.fillMetric(&mem)
+			msg := fmt.Sprintf("%s:gauge:%f", key, valFloat64)
+			heshVal := cryptohash.HeshSHA256(msg, agent.cfg.Key)
+
+			metrica := encoding.Metrics{ID: key, MType: val.Type(), Value: &valFloat64, Hash: heshVal}
+			allMetrics = append(allMetrics, metrica)
+
+			i++
+			if i == constants.ButchSize {
+				if err := agent.goPost2Server(allMetrics); err != nil {
+					t.Errorf("Error checking fillings the metrics")
+				}
+				allMetrics = make(emtyArrMetrics, 0)
+				i = 0
+			}
+		}
+
+		cPollCount := repository.Counter(agent.data.pollCount)
+		msg := fmt.Sprintf("%s:counter:%d", "PollCount", agent.data.pollCount)
+		heshVal := cryptohash.HeshSHA256(msg, agent.cfg.Key)
+
+		metrica := encoding.Metrics{ID: "PollCount", MType: cPollCount.Type(),
+			Delta: &agent.data.pollCount, Hash: heshVal}
+		allMetrics = append(allMetrics, metrica)
+		if err := agent.goPost2Server(allMetrics); err != nil {
+			t.Errorf("Error checking fillings the metrics")
+		}
+	})
 
 	t.Run("Checking the filling of metrics PollCount", func(t *testing.T) {
 
@@ -117,8 +137,8 @@ func TestFuncAgen(t *testing.T) {
 }
 
 func BenchmarkSendMetrics(b *testing.B) {
-	agent := agent{}
-	agent.cfg.Address = "localhost:8080"
+	a := agent{}
+	a.cfg.Address = "localhost:8080"
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < 10000; i++ {
@@ -135,7 +155,7 @@ func BenchmarkSendMetrics(b *testing.B) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			agent.goPost2Server(allMetrics)
+			a.goPost2Server(allMetrics)
 		}()
 	}
 	wg.Wait()
