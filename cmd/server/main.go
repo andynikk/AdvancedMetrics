@@ -34,9 +34,9 @@ func Shutdown(rs *handlers.RepStore) {
 
 func main() {
 
-	fmt.Println(fmt.Sprintf("Build version: <%s>", buildVersion))
-	fmt.Println(fmt.Sprintf("Build date: <%s>", buildDate))
-	fmt.Println(fmt.Sprintf("Build commit: <%s>", buildCommit))
+	fmt.Println(fmt.Sprintf("Build version: %s", buildVersion))
+	fmt.Println(fmt.Sprintf("Build date: %s", buildDate))
+	fmt.Println(fmt.Sprintf("Build commit: %s", buildCommit))
 
 	server := new(server)
 	handlers.NewRepStore(&server.storege)

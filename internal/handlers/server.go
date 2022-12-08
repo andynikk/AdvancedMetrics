@@ -7,16 +7,20 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/gorilla/mux"
 
 	"github.com/andynikk/advancedmetrics/internal/compression"
@@ -40,6 +44,7 @@ const (
 // Хранилище метрик защищено sync.Mutex
 type RepStore struct {
 	Config environment.ServerConfig
+	PK     *encryption.RsaPrivateKey
 	Router *mux.Router
 	sync.Mutex
 	repository.MapMetrics
@@ -61,6 +66,14 @@ func NewRepStore(rs *RepStore) {
 	InitRoutersMux(rs)
 
 	rs.Config = environment.SetConfigServer()
+
+	pvkData, _ := os.ReadFile(rs.Config.CryptoKey)
+	pvkBlock, _ := pem.Decode(pvkData)
+	pvk, err := x509.ParsePKCS1PrivateKey(pvkBlock.Bytes)
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+	}
+	rs.PK = &encryption.RsaPrivateKey{PrivateKey: pvk}
 
 	mapTypeStore := rs.Config.TypeMetricsStorage
 	if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; findKey {
@@ -256,7 +269,7 @@ func (rs *RepStore) HandlerSetMetricaPOST(rw http.ResponseWriter, rq *http.Reque
 func (rs *RepStore) HandlerUpdateMetricJSON(rw http.ResponseWriter, rq *http.Request) {
 
 	var bodyJSON io.Reader
-
+	var arrBody []byte
 	contentEncoding := rq.Header.Get("Content-Encoding")
 	bodyJSON = rq.Body
 	if strings.Contains(contentEncoding, "gzip") {
@@ -267,18 +280,24 @@ func (rs *RepStore) HandlerUpdateMetricJSON(rw http.ResponseWriter, rq *http.Req
 			return
 		}
 
-		arrBody, err := compression.Decompress(bytBody)
+		arrBody, err = compression.Decompress(bytBody)
 		if err != nil {
 			constants.Logger.InfoLog(fmt.Sprintf("$$ 2 %s", err.Error()))
 			http.Error(rw, "Ошибка распаковки", http.StatusInternalServerError)
 			return
 		}
-
-		bodyJSON = bytes.NewReader(arrBody)
 	}
 
+	arrBodyEncrypt, err := rs.PK.RsaDecrypt(arrBody)
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+		http.Error(rw, "Ошибка дешифровки", http.StatusInternalServerError)
+		return
+	}
+	bodyJSON = bytes.NewReader(arrBodyEncrypt)
+
 	var v []encoding.Metrics
-	err := json.NewDecoder(bodyJSON).Decode(&v)
+	err = json.NewDecoder(bodyJSON).Decode(&v)
 	if err != nil {
 		constants.Logger.InfoLog(fmt.Sprintf("$$ 3 %s", err.Error()))
 		http.Error(rw, "Ошибка получения JSON", http.StatusInternalServerError)
@@ -336,11 +355,17 @@ func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Re
 			http.Error(rw, "Ошибка распаковки", http.StatusInternalServerError)
 			return
 		}
-
-		bodyJSON = bytes.NewReader(arrBody)
 	}
 
+	arrBodyEncrypt, err := rs.PK.RsaDecrypt(arrBody)
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+		http.Error(rw, "Ошибка дешифровки", http.StatusInternalServerError)
+		return
+	}
+	bodyJSON = bytes.NewReader(arrBodyEncrypt)
 	respByte, err := io.ReadAll(bodyJSON)
+
 	if err != nil {
 		constants.Logger.ErrorLog(err)
 		http.Error(rw, "Ошибка распаковки", http.StatusInternalServerError)
@@ -366,6 +391,7 @@ func (rs *RepStore) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Req
 
 	var bodyJSON io.Reader
 	bodyJSON = rq.Body
+	var arrBody []byte
 
 	acceptEncoding := rq.Header.Get("Accept-Encoding")
 	contentEncoding := rq.Header.Get("Content-Encoding")
@@ -378,18 +404,24 @@ func (rs *RepStore) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Req
 			return
 		}
 
-		arrBody, err := compression.Decompress(bytBody)
+		arrBody, err = compression.Decompress(bytBody)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			http.Error(rw, "Ошибка распаковки", http.StatusInternalServerError)
 			return
 		}
-
-		bodyJSON = bytes.NewReader(arrBody)
 	}
 
+	arrBodyEncrypt, err := rs.PK.RsaDecrypt(arrBody)
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+		http.Error(rw, "Ошибка дешифровки", http.StatusInternalServerError)
+		return
+	}
+	bodyJSON = bytes.NewReader(arrBodyEncrypt)
+
 	v := encoding.Metrics{}
-	err := json.NewDecoder(bodyJSON).Decode(&v)
+	err = json.NewDecoder(bodyJSON).Decode(&v)
 	if err != nil {
 		constants.Logger.ErrorLog(err)
 		http.Error(rw, "Ошибка получения JSON", http.StatusInternalServerError)

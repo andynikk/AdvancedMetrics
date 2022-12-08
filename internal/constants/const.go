@@ -10,6 +10,10 @@ const (
 	MetricsStorageDB TypeMetricsStorage = iota
 	MetricsStorageFile
 
+	TimeLivingCertificateYaer   = 10
+	TimeLivingCertificateMounth = 0
+	TimeLivingCertificateDay    = 0
+
 	AddressServer       = "localhost:8080"
 	ReportInterval      = 10
 	PollInterval        = 2
