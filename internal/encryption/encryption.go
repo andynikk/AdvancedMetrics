@@ -5,7 +5,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -26,12 +26,12 @@ type RsaPrivateKey struct {
 }
 
 func (rk *RsaPublicKey) RsaEncrypt(msg []byte) ([]byte, error) {
-	encryptedBytes, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, rk.PublicKey, msg, nil)
+	encryptedBytes, err := rsa.EncryptOAEP(sha512.New512_256(), rand.Reader, rk.PublicKey, msg, nil)
 	return encryptedBytes, err
 }
 
 func (rk *RsaPrivateKey) RsaDecrypt(msgByte []byte) ([]byte, error) {
-	decryptedBytes, err := rk.PrivateKey.Decrypt(nil, msgByte, &rsa.OAEPOptions{Hash: crypto.SHA256})
+	decryptedBytes, err := rk.PrivateKey.Decrypt(nil, msgByte, &rsa.OAEPOptions{Hash: crypto.SHA512_256})
 	return decryptedBytes, err
 }
 

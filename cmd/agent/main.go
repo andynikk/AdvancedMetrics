@@ -61,17 +61,17 @@ func (eam *emtyArrMetrics) prepareMetrics(key *encryption.RsaPublicKey) ([]byte,
 		return nil, err
 	}
 
-	encryptedArrMetrics, err := key.RsaEncrypt(arrMetrics)
+	gziparrMetrics, err := compression.Compress(arrMetrics)
 	if err != nil {
 		return nil, err
 	}
 
-	gziparrMetrics, err := compression.Compress(encryptedArrMetrics)
+	encryptedArrMetrics, err := key.RsaEncrypt(gziparrMetrics)
 	if err != nil {
 		return nil, err
 	}
 
-	return gziparrMetrics, nil
+	return encryptedArrMetrics, nil
 }
 
 func (a *agent) fillMetric(mems *runtime.MemStats) {
@@ -172,6 +172,8 @@ func (a *agent) Post2Server(allMterics []byte) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Content-Encryption", "sha512")
+
 	defer req.Body.Close()
 
 	client := &http.Client{}
@@ -187,6 +189,7 @@ func (a *agent) Post2Server(allMterics []byte) error {
 
 func (a *agent) goPost2Server(allMetrics emtyArrMetrics) error {
 	rsaPublicKey := &encryption.RsaPublicKey{PublicKey: a.PublicKey}
+
 	gziparrMetrics, err := allMetrics.prepareMetrics(rsaPublicKey)
 	if err != nil {
 		constants.Logger.ErrorLog(err)
