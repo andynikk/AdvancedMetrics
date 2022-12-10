@@ -274,7 +274,7 @@ func SetConfigServer() ServerConfig {
 	//}
 
 	addressPtr := flag.String("a", "", "имя сервера")
-	restorePtr := flag.Bool("r", "", "восстанавливать значения при старте")
+	restorePtr := flag.Bool("r", false, "восстанавливать значения при старте")
 	storeIntervalPtr := flag.Duration("i", constants.StoreInterval, "интервал автосохранения (сек.)")
 	storeFilePtr := flag.String("f", "", "путь к файлу метрик")
 	keyFlag := flag.String("k", "", "ключ хеша")
