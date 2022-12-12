@@ -170,6 +170,9 @@ func InitConfigAgent() AgentConfig {
 	} else {
 		pathFileCfg = pathFileCfg
 	}
+	if pathFileCfg == "" {
+		pathFileCfg = "c:\\Bases\\Go\\AdvancedMetrics\\cmd\\agent\\config.cfg"
+	}
 
 	var jsonCfg AgentConfigFile
 	jsonCfg = GetAgentConfigFile(&pathFileCfg)
@@ -286,6 +289,9 @@ func InitConfigServer() (ServerConfig, error) {
 	} else {
 		pathFileCfg = pathFileCfg
 	}
+	if pathFileCfg == "" {
+		pathFileCfg = "c:\\Bases\\Go\\AdvancedMetrics\\cmd\\server\\config.cfg"
+	}
 
 	var jsonCfg ServerConfigFile
 	jsonCfg = GetServerConfigFile(&pathFileCfg)
@@ -347,9 +353,6 @@ func InitConfigServer() (ServerConfig, error) {
 	} else {
 		databaseDsn = jsonCfg.StoreFile
 	}
-	//if databaseDsn != "" {
-	//	databaseDsn = databaseDsn + "/" + constants.NameDB
-	//}
 
 	var patchCryptoKey string
 	if _, ok := os.LookupEnv("CRYPTO_KEY"); ok {

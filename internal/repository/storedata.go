@@ -38,6 +38,30 @@ type TypeStoreData interface {
 	ConnDB() *pgxpool.Pool
 }
 
+// Init инициализация хранилища БД
+func InitStore(mts MapTypeStore, store string) (MapTypeStore, error) {
+	if _, findKey := mts[constants.MetricsStorageDB.String()]; findKey {
+		ctx := context.Background()
+
+		dbc, err := postgresql.PoolDB(store)
+		if err != nil {
+			return nil, err
+		}
+
+		mts[constants.MetricsStorageDB.String()] = &TypeStoreDataDB{
+			DBC: *dbc, Ctx: ctx, DBDsn: store,
+		}
+		if ok := mts[constants.MetricsStorageDB.String()].CreateTable(); !ok {
+			return nil, err
+		}
+	}
+	if _, findKey := mts[constants.MetricsStorageFile.String()]; findKey {
+		mts[constants.MetricsStorageDB.String()] = &TypeStoreDataFile{StoreFile: store}
+	}
+
+	return mts, nil
+}
+
 // WriteMetric Запись метрик в базу данных
 func (sdb *TypeStoreDataDB) WriteMetric(storedData encoding.ArrMetrics) {
 	dataBase := sdb.DBC
@@ -92,7 +116,6 @@ func (sdb *TypeStoreDataDB) ConnDB() *pgxpool.Pool {
 
 // CreateTable Проверка и создание, если таковых нет, таблиц в базе данных
 func (sdb *TypeStoreDataDB) CreateTable() bool {
-
 	ctx := context.Background()
 	conn, err := sdb.DBC.Pool.Acquire(ctx)
 	if err != nil {
@@ -100,19 +123,16 @@ func (sdb *TypeStoreDataDB) CreateTable() bool {
 		return false
 	}
 	defer conn.Release()
-
 	if _, err := conn.Exec(sdb.Ctx, constants.QuerySchema); err != nil {
 		conn.Release()
 		constants.Logger.ErrorLog(err)
 		return false
 	}
-
 	if _, err := conn.Exec(sdb.Ctx, constants.QueryTable); err != nil {
 		conn.Release()
 		constants.Logger.ErrorLog(err)
 		return false
 	}
-
 	conn.Release()
 	ctx.Done()
 

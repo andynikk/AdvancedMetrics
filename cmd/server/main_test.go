@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,8 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gorilla/mux"
-
 	"github.com/andynikk/advancedmetrics/internal/compression"
 	"github.com/andynikk/advancedmetrics/internal/constants"
 	"github.com/andynikk/advancedmetrics/internal/cryptohash"
@@ -20,8 +17,8 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/handlers"
-	"github.com/andynikk/advancedmetrics/internal/postgresql"
 	"github.com/andynikk/advancedmetrics/internal/repository"
+	"github.com/gorilla/mux"
 )
 
 func TestFuncServer(t *testing.T) {
@@ -86,25 +83,16 @@ func TestFuncServer(t *testing.T) {
 	})
 
 	t.Run("Checking connect DB", func(t *testing.T) {
-		ctx := context.Background()
-
-		dbConn, err := postgresql.PoolDB(rp.Config.DatabaseDsn)
-		if err != nil {
-			t.Errorf("Error create DB connection")
-		}
 		t.Run("Checking create DB table", func(t *testing.T) {
-			mapTypeStore := rp.Config.TypeMetricsStorage
-			mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataDB{
-				DBC: *dbConn, Ctx: ctx, DBDsn: rp.Config.DatabaseDsn,
+			typeMetricsStorage, err := repository.InitStore(rp.Config.TypeMetricsStorage, rp.Config.DatabaseDsn)
+			if err != nil {
+				t.Errorf(fmt.Sprintf("Error create DB table: %s", err.Error()))
 			}
-			if ok := mapTypeStore[constants.MetricsStorageDB.String()].CreateTable(); !ok {
-				t.Errorf("Error create DB table")
-			}
+			rp.Config.TypeMetricsStorage = typeMetricsStorage
 			t.Run("Checking handlers /ping GET", func(t *testing.T) {
 				mapTypeStore := rp.Config.TypeMetricsStorage
 				if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
 					t.Errorf("Error handlers /ping GET")
-					return
 				}
 
 				if mapTypeStore[constants.MetricsStorageDB.String()].ConnDB() == nil {
@@ -281,7 +269,6 @@ func TestFuncServer(t *testing.T) {
 			body := bytes.NewReader(arrMetrics)
 			resp := testRequest(t, ts, http.MethodPost, "/update", body)
 			defer resp.Body.Close()
-
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Error handler /update POST/")
 			}

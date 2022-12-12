@@ -25,7 +25,6 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
-	"github.com/andynikk/advancedmetrics/internal/postgresql"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 
@@ -65,25 +64,8 @@ func NewRepStore(rs *RepStore) {
 	rs.Config, _ = environment.InitConfigServer()
 	rs.PK, _ = encryption.InitPrivateKey(rs.Config.CryptoKey)
 
-	mapTypeStore := rs.Config.TypeMetricsStorage
-	if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; findKey {
-		ctx := context.Background()
-
-		dbc, err := postgresql.PoolDB(rs.Config.DatabaseDsn)
-		if err != nil {
-			constants.Logger.ErrorLog(err)
-		}
-
-		mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataDB{
-			DBC: *dbc, Ctx: ctx, DBDsn: rs.Config.DatabaseDsn,
-		}
-		if ok := mapTypeStore[constants.MetricsStorageDB.String()].CreateTable(); !ok {
-			constants.Logger.ErrorLog(err)
-		}
-	}
-	if _, findKey := mapTypeStore[constants.MetricsStorageFile.String()]; findKey {
-		mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataFile{StoreFile: rs.Config.StoreFile}
-	}
+	rs.Config.TypeMetricsStorage, _ = repository.InitStore(rs.Config.TypeMetricsStorage, rs.Config.DatabaseDsn)
+	rs.Config.TypeMetricsStorage, _ = repository.InitStore(rs.Config.TypeMetricsStorage, rs.Config.StoreFile)
 }
 
 // InitRoutersMux создание роутера.

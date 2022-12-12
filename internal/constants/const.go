@@ -47,7 +47,7 @@ const (
 					FROM 
 						metrics.store`
 
-	NameDB = `yapracticum2`
+	NameDB = `yapracticum`
 
 	QueryCheckExistDB = `SELECT datname FROM pg_database WHERE datname = '%s' ORDER BY 1;`
 
