@@ -38,8 +38,8 @@ type TypeStoreData interface {
 	ConnDB() *pgxpool.Pool
 }
 
-// Init инициализация хранилища БД
-func InitStore(mts MapTypeStore, store string) (MapTypeStore, error) {
+// InitStoreDB инициализация хранилища БД
+func InitStoreDB(mts MapTypeStore, store string) (MapTypeStore, error) {
 	if _, findKey := mts[constants.MetricsStorageDB.String()]; findKey {
 		ctx := context.Background()
 
@@ -55,6 +55,16 @@ func InitStore(mts MapTypeStore, store string) (MapTypeStore, error) {
 			return nil, err
 		}
 	}
+	//if _, findKey := mts[constants.MetricsStorageFile.String()]; findKey {
+	//	mts[constants.MetricsStorageDB.String()] = &TypeStoreDataFile{StoreFile: store}
+	//}
+
+	return mts, nil
+}
+
+// InitStoreFile инициализация хранилища в файле
+func InitStoreFile(mts MapTypeStore, store string) (MapTypeStore, error) {
+
 	if _, findKey := mts[constants.MetricsStorageFile.String()]; findKey {
 		mts[constants.MetricsStorageDB.String()] = &TypeStoreDataFile{StoreFile: store}
 	}

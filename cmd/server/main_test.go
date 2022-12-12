@@ -28,10 +28,10 @@ func TestFuncServer(t *testing.T) {
 	rp := new(handlers.RepStore)
 	rp.MutexRepo = make(repository.MutexRepo)
 
-	t.Run("Checking init routers", func(t *testing.T) {
+	t.Run("Checking init router", func(t *testing.T) {
 		handlers.InitRoutersMux(rp)
 		if rp.Router == nil {
-			t.Errorf("Error checking init routers")
+			t.Errorf("Error checking init router")
 		}
 	})
 
@@ -84,7 +84,7 @@ func TestFuncServer(t *testing.T) {
 
 	t.Run("Checking connect DB", func(t *testing.T) {
 		t.Run("Checking create DB table", func(t *testing.T) {
-			typeMetricsStorage, err := repository.InitStore(rp.Config.TypeMetricsStorage, rp.Config.DatabaseDsn)
+			typeMetricsStorage, err := repository.InitStoreDB(rp.Config.TypeMetricsStorage, rp.Config.DatabaseDsn)
 			if err != nil {
 				t.Errorf(fmt.Sprintf("Error create DB table: %s", err.Error()))
 			}
@@ -97,7 +97,6 @@ func TestFuncServer(t *testing.T) {
 
 				if mapTypeStore[constants.MetricsStorageDB.String()].ConnDB() == nil {
 					t.Errorf("Error handlers /ping GET")
-					return
 				}
 			})
 		})
@@ -108,14 +107,12 @@ func TestFuncServer(t *testing.T) {
 			var c repository.Counter = 58
 			if c.String() != "58" {
 				t.Errorf(`Error method "String" for Counter `)
-				return
 			}
 		})
 		t.Run(`Checking method "String" type "Gauge"`, func(t *testing.T) {
 			var c repository.Gauge = 0.001
 			if c.String() != "0.001" {
 				t.Errorf(`Error method "String" for Counter `)
-				return
 			}
 		})
 		t.Run(`Checking method "GetMetrics" type "Counter"`, func(t *testing.T) {
@@ -132,7 +129,6 @@ func TestFuncServer(t *testing.T) {
 
 			if msg != "MType: counter, ID: TestCounter, Value: 0, Delta: 58, Hash: 29bd8e4bde7ec6302393fe3f7954895a65f4d4b22372d00a35fc1adbcc2ec239" {
 				t.Errorf(`method "GetMetrics" type "Counter"`)
-				return
 			}
 		})
 		t.Run(`Checking method "GetMetrics" type "Gauge"`, func(t *testing.T) {
@@ -148,7 +144,6 @@ func TestFuncServer(t *testing.T) {
 				mt.MType, mt.ID, *mt.Value, 0, mt.Hash)
 			if msg != "MType: gauge, ID: TestGauge, Value: 0.010000, Delta: 0, Hash: 4e5d8a0e257dd12355b15f730591dddd9e45e18a6ef67460a58f20edc12c9465" {
 				t.Errorf(`method "GetMetrics" type "Counter"`)
-				return
 			}
 		})
 		t.Run(`Checking method "Set" type "Counter"`, func(t *testing.T) {
@@ -164,7 +159,6 @@ func TestFuncServer(t *testing.T) {
 
 			if c != 58 {
 				t.Errorf(`Error method "Set" for Counter `)
-				return
 			}
 		})
 		t.Run(`Checking method "Set" type "Gauge"`, func(t *testing.T) {
@@ -180,7 +174,6 @@ func TestFuncServer(t *testing.T) {
 			g.Set(v)
 			if g != 0.01 {
 				t.Errorf(`Error method "Set" for Counter `)
-				return
 			}
 		})
 		t.Run(`Checking method "Type" type "Counter"`, func(t *testing.T) {
@@ -215,13 +208,13 @@ func TestFuncServer(t *testing.T) {
 		t.Run(`Checking method PrepareDataBU`, func(t *testing.T) {
 			valG := repository.Gauge(0)
 			if ok := valG.SetFromText("0.001"); !ok {
-				return
+				t.Errorf(`Error method "PrepareDataBU"`)
 			}
 			rp.MutexRepo["TestGauge"] = &valG
 
 			valC := repository.Counter(0)
 			if ok := valC.SetFromText("58"); !ok {
-				return
+				t.Errorf(`Error method "PrepareDataBU"`)
 			}
 			rp.MutexRepo["TestCounter"] = &valC
 
@@ -252,14 +245,14 @@ func TestFuncServer(t *testing.T) {
 				}
 			})
 		})
-		t.Run("Checking handler /updates POST/", func(t *testing.T) {
-			//resp := testRequest(t, ts, http.MethodPost, "/updates", nil)
-			//defer resp.Body.Close()
-			//
-			//if resp.StatusCode != http.StatusOK {
-			//	t.Errorf("Error handler //update/{metType}/{metName}/{metValue}/")
-			//}
-		})
+		//t.Run("Checking handler /updates POST/", func(t *testing.T) {
+		//	//resp := testRequest(t, ts, http.MethodPost, "/updates", nil)
+		//	//defer resp.Body.Close()
+		//	//
+		//	//if resp.StatusCode != http.StatusOK {
+		//	//	t.Errorf("Error handler //update/{metType}/{metName}/{metValue}/")
+		//	//}
+		//})
 		t.Run("Checking handler /update POST/", func(t *testing.T) {
 			testA := testArray("")
 			arrMetrics, err := json.MarshalIndent(testA, "", " ")
@@ -383,7 +376,6 @@ func TestFuncServer(t *testing.T) {
 		txtData := "Test data"
 
 		hashData := cryptohash.HeshSHA256(txtData, configKey)
-		print(len(hashData))
 		if hashData == "" || len(hashData) != 64 {
 			t.Errorf("Error checking Hash SHA 256")
 		}
@@ -431,7 +423,6 @@ func TestFuncServer(t *testing.T) {
 				t.Errorf("Error checking marshal metrics JSON")
 			}
 		}
-
 	})
 }
 
