@@ -2,14 +2,18 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/andynikk/advancedmetrics/internal/constants"
-	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
+	"github.com/andynikk/advancedmetrics/internal/encryption"
+	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 
@@ -34,6 +38,13 @@ func TestFuncAgen(t *testing.T) {
 	a.data.metricsGauge = make(MetricsGauge)
 
 	var argErr = "err"
+
+	t.Run("Checking init config", func(t *testing.T) {
+		a.cfg = environment.InitConfigAgent()
+		if a.cfg.Address == "" {
+			t.Errorf("Error checking init config")
+		}
+	})
 
 	t.Run("Checking the structure creation", func(t *testing.T) {
 
@@ -60,7 +71,37 @@ func TestFuncAgen(t *testing.T) {
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 
-	a.fillMetric(&mem)
+	t.Run("Checking rsa crypt", func(t *testing.T) {
+		t.Run("Checking init crypto key", func(t *testing.T) {
+			a.PublicKey, _ = encryption.InitPublicKey(a.cfg.CryptoKey)
+			if a.cfg.CryptoKey != "" && a.PublicKey == nil {
+				t.Errorf("Error checking init crypto key")
+			}
+			t.Run("Checking rsa encrypt", func(t *testing.T) {
+				testMsg := "Тестовое сообщение"
+
+				rsaPublicKey := encryption.RsaPublicKey{PublicKey: a.PublicKey}
+				_, err := rsaPublicKey.RsaEncrypt([]byte(testMsg))
+				if err != nil {
+					t.Errorf("Error checking rsa encrypt")
+				}
+			})
+		})
+	})
+
+	t.Run("Checking the filling of metrics", func(t *testing.T) {
+		a.fillMetric()
+		if len(a.metricsGauge) == 0 || a.pollCount == 0 {
+			t.Errorf("Error checking the filling of metrics")
+		}
+		t.Run("Checking the filling of other metrics", func(t *testing.T) {
+			a.metrixOtherScan()
+			if _, ok := a.metricsGauge["TotalMemory"]; !ok {
+				t.Errorf("Error checking the filling of other metrics")
+			}
+		})
+	})
+
 	t.Run("Checking the filling of metrics Gauge", func(t *testing.T) {
 
 		val := a.data.metricsGauge["Frees"]
@@ -77,39 +118,35 @@ func TestFuncAgen(t *testing.T) {
 	})
 
 	t.Run("Checking fillings the metrics", func(t *testing.T) {
-		a.fillMetric(&mem)
-		allMetrics := make(emtyArrMetrics, 0)
-		i := 0
-		tempMetricsGauge := &a.data.metricsGauge
-		for key, val := range *tempMetricsGauge {
-			valFloat64 := float64(val)
-
-			msg := fmt.Sprintf("%s:gauge:%f", key, valFloat64)
-			heshVal := cryptohash.HeshSHA256(msg, a.cfg.Key)
-
-			metrica := encoding.Metrics{ID: key, MType: val.Type(), Value: &valFloat64, Hash: heshVal}
-			allMetrics = append(allMetrics, metrica)
-
-			i++
-			if i == constants.ButchSize {
-				if err := a.goPost2Server(allMetrics); err != nil {
-					t.Errorf("Error checking fillings the metrics")
-				}
-				allMetrics = make(emtyArrMetrics, 0)
-				i = 0
-			}
-		}
-
-		cPollCount := repository.Counter(a.data.pollCount)
-		msg := fmt.Sprintf("%s:counter:%d", "PollCount", a.data.pollCount)
-		heshVal := cryptohash.HeshSHA256(msg, a.cfg.Key)
-
-		metrica := encoding.Metrics{ID: "PollCount", MType: cPollCount.Type(),
-			Delta: &a.data.pollCount, Hash: heshVal}
-		allMetrics = append(allMetrics, metrica)
-		if err := a.goPost2Server(allMetrics); err != nil {
+		mapMetricsButch, err := a.SendMetricsServer()
+		if err != nil {
 			t.Errorf("Error checking fillings the metrics")
 		}
+		t.Run("Send metrics to server", func(t *testing.T) {
+			for _, allMetrics := range mapMetricsButch {
+				rsaPublicKey := &encryption.RsaPublicKey{PublicKey: a.PublicKey}
+
+				gziparrMetrics, err := allMetrics.prepareMetrics(rsaPublicKey)
+				if err != nil {
+					constants.Logger.ErrorLog(err)
+					t.Errorf("Send metrics to server")
+				}
+
+				resp := httptest.NewRecorder()
+				req, err := http.NewRequest("POST", "localhost:8080/updates", strings.NewReader(string(gziparrMetrics)))
+				if err != nil {
+					t.Fatal(err)
+				}
+				http.DefaultServeMux.ServeHTTP(resp, req)
+				if p, err := io.ReadAll(resp.Body); err != nil {
+					t.Errorf("Error send metrics to server")
+				} else {
+					if string(p) != "" {
+						t.Errorf("Error send metrics to server")
+					}
+				}
+			}
+		})
 	})
 
 	t.Run("Checking the filling of metrics PollCount", func(t *testing.T) {
@@ -128,7 +165,7 @@ func TestFuncAgen(t *testing.T) {
 	})
 
 	t.Run("Increasing the metric PollCount", func(t *testing.T) {
-		var res = int64(2)
+		var res = int64(1)
 		if a.data.pollCount != res {
 			t.Errorf("The metric %s has not increased by %v", "PollCount", res)
 		}
@@ -144,6 +181,7 @@ func BenchmarkSendMetrics(b *testing.B) {
 	wg := sync.WaitGroup{}
 	for i := 0; i < 10000; i++ {
 		var allMetrics emtyArrMetrics
+		mapMetricsButch := MapMetricsButch{}
 
 		val := repository.Gauge(0)
 		for j := 0; j < 10; j++ {
@@ -153,10 +191,11 @@ func BenchmarkSendMetrics(b *testing.B) {
 			metrica := encoding.Metrics{ID: id, MType: val.Type(), Value: &floatJ, Hash: ""}
 			allMetrics = append(allMetrics, metrica)
 		}
+		mapMetricsButch[1] = allMetrics
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			a.goPost2Server(allMetrics)
+			a.goPost2Server(&mapMetricsButch)
 		}()
 	}
 	wg.Wait()

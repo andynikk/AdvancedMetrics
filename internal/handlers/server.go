@@ -7,15 +7,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/pprof"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -65,15 +62,8 @@ func NewRepStore(rs *RepStore) {
 
 	InitRoutersMux(rs)
 
-	rs.Config = environment.SetConfigServer()
-
-	pvkData, _ := os.ReadFile(rs.Config.CryptoKey)
-	pvkBlock, _ := pem.Decode(pvkData)
-	pvk, err := x509.ParsePKCS1PrivateKey(pvkBlock.Bytes)
-	if err != nil {
-		constants.Logger.ErrorLog(err)
-	}
-	rs.PK = &encryption.RsaPrivateKey{PrivateKey: pvk}
+	rs.Config, _ = environment.InitConfigServer()
+	rs.PK, _ = encryption.InitPrivateKey(rs.Config.CryptoKey)
 
 	mapTypeStore := rs.Config.TypeMetricsStorage
 	if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; findKey {
@@ -380,6 +370,12 @@ func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Re
 		constants.Logger.ErrorLog(err)
 		http.Error(rw, "Ошибка распаковки", http.StatusInternalServerError)
 	}
+
+	//for _, val := range storedData {
+	//	if val.ID == "BuckHashSys" {
+	//		fmt.Println(fmt.Sprintf("BuckHashSys: %f", *val.Value))
+	//	}
+	//}
 
 	rs.SetValueInMapJSON(storedData)
 

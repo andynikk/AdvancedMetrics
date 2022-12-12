@@ -109,9 +109,9 @@ func ParsCfgByte(res []byte) bytes.Buffer {
 
 		if configLines[i] != "" {
 			var strs string
-			splitStr := strings.SplitAfterN(configLines[i], "//", -1)
+			splitStr := strings.SplitAfterN(configLines[i], "// ", -1)
 			if len(splitStr) != 0 {
-				strs = strings.Replace(splitStr[0], "//", "\n", -1)
+				strs = strings.Replace(splitStr[0], "// ", "\n", -1)
 				out.WriteString(strs)
 			}
 		}
@@ -141,7 +141,7 @@ func GetAgentConfigFile(file *string) AgentConfigFile {
 
 }
 
-func SetConfigAgent() AgentConfig {
+func InitConfigAgent() AgentConfig {
 
 	addressPtr := flag.String("a", "", "имя сервера")
 	reportIntervalPtr := flag.Duration("r", 0, "интервал отправки на сервер")
@@ -255,11 +255,11 @@ func GetServerConfigFile(file *string) ServerConfigFile {
 
 }
 
-func SetConfigServer() ServerConfig {
+func InitConfigServer() (ServerConfig, error) {
 
 	addressPtr := flag.String("a", "", "имя сервера")
 	restorePtr := flag.Bool("r", false, "восстанавливать значения при старте")
-	storeIntervalPtr := flag.Duration("i", constants.StoreInterval, "интервал автосохранения (сек.)")
+	storeIntervalPtr := flag.Duration("i", 0, "интервал автосохранения (сек.)")
 	storeFilePtr := flag.String("f", "", "путь к файлу метрик")
 	keyFlag := flag.String("k", "", "ключ хеша")
 	keyDatabaseDsn := flag.String("d", "", "строка соединения с базой")
@@ -272,7 +272,7 @@ func SetConfigServer() ServerConfig {
 	var cfgENV ServerConfigENV
 	err := env.Parse(&cfgENV)
 	if err != nil {
-		log.Fatal(err)
+		return ServerConfig{}, err
 	}
 
 	pathFileCfg := ""
@@ -347,6 +347,9 @@ func SetConfigServer() ServerConfig {
 	} else {
 		databaseDsn = jsonCfg.StoreFile
 	}
+	//if databaseDsn != "" {
+	//	databaseDsn = databaseDsn + "/" + constants.NameDB
+	//}
 
 	var patchCryptoKey string
 	if _, ok := os.LookupEnv("CRYPTO_KEY"); ok {
@@ -378,5 +381,5 @@ func SetConfigServer() ServerConfig {
 		DatabaseDsn:        databaseDsn,
 		TypeMetricsStorage: MapTypeStore,
 		CryptoKey:          patchCryptoKey,
-	}
+	}, nil
 }

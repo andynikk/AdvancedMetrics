@@ -61,5 +61,4 @@ func main() {
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	<-stop
 	Shutdown(&server.storege)
-
 }

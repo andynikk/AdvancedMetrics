@@ -112,6 +112,7 @@ func (sdb *TypeStoreDataDB) CreateTable() bool {
 		constants.Logger.ErrorLog(err)
 		return false
 	}
+
 	conn.Release()
 	ctx.Done()
 

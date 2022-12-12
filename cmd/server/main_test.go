@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/gorilla/mux"
 
 	"github.com/andynikk/advancedmetrics/internal/compression"
@@ -40,29 +41,67 @@ func TestFuncServer(t *testing.T) {
 
 	rp := new(handlers.RepStore)
 	rp.MutexRepo = make(repository.MutexRepo)
-	handlers.InitRoutersMux(rp)
-	sc := environment.SetConfigServer()
+
+	t.Run("Checking init routers", func(t *testing.T) {
+		handlers.InitRoutersMux(rp)
+		if rp.Router == nil {
+			t.Errorf("Error checking init routers")
+		}
+	})
+
+	t.Run("Checking init config", func(t *testing.T) {
+		rp.Config, _ = environment.InitConfigServer()
+		if rp.Config.Address == "" {
+			t.Errorf("Error checking init config")
+		}
+	})
+
+	t.Run("Checking rsa crypt", func(t *testing.T) {
+		t.Run("Checking init crypto key", func(t *testing.T) {
+			rp.PK, _ = encryption.InitPrivateKey(rp.Config.CryptoKey)
+			if rp.Config.CryptoKey != "" && rp.PK == nil {
+				t.Errorf("Error checking init crypto key")
+			}
+		})
+		t.Run("Checking rsa encrypt", func(t *testing.T) {
+			testMsg := "Тестовое сообщение"
+
+			rsaPublicKey := encryption.RsaPublicKey{PublicKey: &rp.PK.PrivateKey.PublicKey}
+			encryptMsg, err := rsaPublicKey.RsaEncrypt([]byte(testMsg))
+			if err != nil {
+				t.Errorf("Error checking rsa encrypt")
+			}
+			t.Run("Checking rsa decrypt", func(t *testing.T) {
+				rsaPrivateKey := encryption.RsaPrivateKey{PrivateKey: rp.PK.PrivateKey}
+				decryptMsg, err := rsaPrivateKey.RsaDecrypt(encryptMsg)
+				if err != nil {
+					t.Errorf("Error checking rsa decrypt")
+				}
+				byteTestMsg := []byte(testMsg)
+				if bytes.Compare(decryptMsg, byteTestMsg) != 0 {
+					t.Errorf("Error checking rsa decrypt")
+				}
+			})
+		})
+	})
 
 	t.Run("Checking connect DB", func(t *testing.T) {
 		ctx := context.Background()
 
-		dbConn, err := postgresql.PoolDB(sc.DatabaseDsn)
+		dbConn, err := postgresql.PoolDB(rp.Config.DatabaseDsn)
 		if err != nil {
 			t.Errorf("Error create DB connection")
 		}
 		t.Run("Checking create DB table", func(t *testing.T) {
-			mapTypeStore := sc.TypeMetricsStorage
+			mapTypeStore := rp.Config.TypeMetricsStorage
 			mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataDB{
-				DBC: *dbConn, Ctx: ctx, DBDsn: sc.DatabaseDsn,
+				DBC: *dbConn, Ctx: ctx, DBDsn: rp.Config.DatabaseDsn,
 			}
 			if ok := mapTypeStore[constants.MetricsStorageDB.String()].CreateTable(); !ok {
 				t.Errorf("Error create DB table")
 			}
 			t.Run("Checking handlers /ping GET", func(t *testing.T) {
-				ts := httptest.NewServer(rp.Router)
-				defer ts.Close()
-
-				mapTypeStore := sc.TypeMetricsStorage
+				mapTypeStore := rp.Config.TypeMetricsStorage
 				if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
 					t.Errorf("Error handlers /ping GET")
 					return
@@ -214,7 +253,7 @@ func TestFuncServer(t *testing.T) {
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
-				t.Errorf("Error handler //update/{metType}/{metName}/{metValue}/")
+				t.Errorf("Error handler /update/{metType}/{metName}/{metValue}/")
 			}
 			t.Run("Checking handler /value/", func(t *testing.T) {
 				resp := testRequest(t, ts, http.MethodGet, "/value/gauge/TestGauge", nil)
@@ -225,15 +264,14 @@ func TestFuncServer(t *testing.T) {
 				}
 			})
 		})
-		//t.Run("Checking handler /updates POST/", func(t *testing.T) {
-		//
-		//	resp := testRequest(t, ts, http.MethodPost, "/updates", nil)
-		//	defer resp.Body.Close()
-		//
-		//	if resp.StatusCode != http.StatusOK {
-		//		t.Errorf("Error handler //update/{metType}/{metName}/{metValue}/")
-		//	}
-		//})
+		t.Run("Checking handler /updates POST/", func(t *testing.T) {
+			//resp := testRequest(t, ts, http.MethodPost, "/updates", nil)
+			//defer resp.Body.Close()
+			//
+			//if resp.StatusCode != http.StatusOK {
+			//	t.Errorf("Error handler //update/{metType}/{metName}/{metValue}/")
+			//}
+		})
 		t.Run("Checking handler /update POST/", func(t *testing.T) {
 			testA := testArray("")
 			arrMetrics, err := json.MarshalIndent(testA, "", " ")
@@ -395,6 +433,18 @@ func TestFuncServer(t *testing.T) {
 				t.Errorf("Error checking Hash SHA 256")
 			}
 		})
+	})
+
+	t.Run("Checking marshal metrics JSON", func(t *testing.T) {
+
+		for key, val := range rp.MutexRepo {
+			mt := val.GetMetrics(val.Type(), key, rp.Config.Key)
+			_, err := mt.MarshalMetrica()
+			if err != nil {
+				t.Errorf("Error checking marshal metrics JSON")
+			}
+		}
+
 	})
 }
 

@@ -44,10 +44,32 @@ func PoolDB(dsn string) (*DBConnector, error) {
 	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+
 	pool, err := pgxpool.Connect(ctx, dsn)
 	if err != nil {
 		fmt.Print(err.Error())
 	}
+
+	strQuery := fmt.Sprintf(constants.QueryCheckExistDB, constants.NameDB)
+	rows, err := pool.Query(ctx, strQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		strQuery = fmt.Sprintf(constants.QueryDB, constants.NameDB)
+		if _, err = pool.Exec(ctx, strQuery); err != nil {
+			return nil, err
+		}
+	}
+
+	pool, err = pgxpool.Connect(ctx, dsn+"/"+constants.NameDB)
+	if err != nil {
+		return nil, err
+	}
+
 	dbc := DBConnector{
 		Pool: pool,
 		Context: Context{

@@ -47,6 +47,12 @@ const (
 					FROM 
 						metrics.store`
 
+	NameDB = `yapracticum2`
+
+	QueryCheckExistDB = `SELECT datname FROM pg_database WHERE datname = '%s' ORDER BY 1;`
+
+	QueryDB = `CREATE DATABASE %s`
+
 	QuerySchema = `CREATE SCHEMA IF NOT EXISTS metrics`
 
 	QueryTable = `CREATE TABLE IF NOT EXISTS metrics.store

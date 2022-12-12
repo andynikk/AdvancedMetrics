@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -106,4 +107,32 @@ func SaveKeyInFile(key *bytes.Buffer, pathFile string) {
 	if err != nil {
 		return
 	}
+}
+
+func InitPrivateKey(cryptoKey string) (*RsaPrivateKey, error) {
+
+	if cryptoKey == "" {
+		return nil, errors.New("путь к приватному ключу не указан")
+	}
+	pvkData, _ := os.ReadFile(cryptoKey)
+	pvkBlock, _ := pem.Decode(pvkData)
+	pvk, err := x509.ParsePKCS1PrivateKey(pvkBlock.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return &RsaPrivateKey{PrivateKey: pvk}, nil
+}
+
+func InitPublicKey(cryptoKey string) (*rsa.PublicKey, error) {
+
+	if cryptoKey == "" {
+		return nil, errors.New("не указан путь к публичному ключу")
+	}
+
+	certData, _ := os.ReadFile(cryptoKey)
+	certBlock, _ := pem.Decode(certData)
+	cert, _ := x509.ParseCertificate(certBlock.Bytes)
+	certPublicKey := cert.PublicKey.(*rsa.PublicKey)
+
+	return certPublicKey, nil
 }
