@@ -11,13 +11,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/gorilla/mux"
 
 	"github.com/andynikk/advancedmetrics/internal/compression"
 	"github.com/andynikk/advancedmetrics/internal/constants"
 	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
+	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/handlers"
 	"github.com/andynikk/advancedmetrics/internal/postgresql"
@@ -27,17 +27,6 @@ import (
 func TestFuncServer(t *testing.T) {
 	var fValue float64 = 0.001
 	var iDelta int64 = 10
-
-	var postStr = "http://127.0.0.1:8080/update/gauge/Alloc/0.1\nhttp://127.0.0.1:8080/update/gauge/" +
-		"BuckHashSys/0.002\nhttp://127.0.0.1:8080/update/counter/PollCount/5"
-
-	t.Run("Checking the filling of metrics Gauge", func(t *testing.T) {
-
-		messageRaz := strings.Split(postStr, "\n")
-		if len(messageRaz) != 3 {
-			t.Errorf("The string (%s) was incorrectly decomposed into an array", postStr)
-		}
-	})
 
 	rp := new(handlers.RepStore)
 	rp.MutexRepo = make(repository.MutexRepo)
@@ -53,6 +42,17 @@ func TestFuncServer(t *testing.T) {
 		rp.Config, _ = environment.InitConfigServer()
 		if rp.Config.Address == "" {
 			t.Errorf("Error checking init config")
+		}
+	})
+
+	postStr := fmt.Sprintf("http://%s/update/gauge/Alloc/0.1\nhttp://%s/update/gauge/BuckHashSys/0.002"+
+		"\nhttp://%s/update/counter/PollCount/5", rp.Config.Address, rp.Config.Address, rp.Config.Address)
+
+	t.Run("Checking the filling of metrics Gauge", func(t *testing.T) {
+
+		messageRaz := strings.Split(postStr, "\n")
+		if len(messageRaz) != 3 {
+			t.Errorf("The string (%s) was incorrectly decomposed into an array", postStr)
 		}
 	})
 

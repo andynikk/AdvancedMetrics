@@ -17,9 +17,8 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 
-func TestmakeMsg(memStats MetricsGauge) string {
+func TestmakeMsg(adresServer string, memStats MetricsGauge) string {
 
-	const adresServer = "127.0.0.1:8080"
 	const msgFormat = "http://%s/update/%s/%s/%v"
 
 	var msg []string
@@ -39,6 +38,9 @@ func TestFuncAgen(t *testing.T) {
 
 	var argErr = "err"
 
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+
 	t.Run("Checking init config", func(t *testing.T) {
 		a.cfg = environment.InitConfigAgent()
 		if a.cfg.Address == "" {
@@ -50,26 +52,23 @@ func TestFuncAgen(t *testing.T) {
 
 		var realResult MetricsGauge
 
-		if a.data.metricsGauge["Alloc"] != realResult["Alloc"] && a.data.metricsGauge["RandomValue"] != realResult["RandomValue"] {
+		if a.data.metricsGauge["Alloc"] != realResult["Alloc"] &&
+			a.data.metricsGauge["RandomValue"] != realResult["RandomValue"] {
 
 			//t.Errorf("Structure creation error", resultMS, realResult)
 			t.Errorf("Structure creation error (%s)", argErr)
 		}
 		t.Run("Creating a submission line", func(t *testing.T) {
-			var resultStr = "http://127.0.0.1:8080/update/gauge/Alloc/0.1\nhttp://127.0.0.1:8080/update/gauge/BuckHashSys/0.002"
+			adressServer := a.cfg.Address
+			var resultStr = fmt.Sprintf("http://%s/update/gauge/Alloc/0.1"+
+				"\nhttp://%s/update/gauge/BuckHashSys/0.002", adressServer, adressServer)
 
-			resultMassage := TestmakeMsg(realResult)
-
+			resultMassage := TestmakeMsg(adressServer, realResult)
 			if resultStr != resultMassage {
-
-				//t.Errorf("Error creating a submission line", string(resultMS), realResult)
 				t.Errorf("Error creating a submission line (%s)", argErr)
 			}
 		})
 	})
-
-	var mem runtime.MemStats
-	runtime.ReadMemStats(&mem)
 
 	t.Run("Checking rsa crypt", func(t *testing.T) {
 		t.Run("Checking init crypto key", func(t *testing.T) {
@@ -133,7 +132,8 @@ func TestFuncAgen(t *testing.T) {
 				}
 
 				resp := httptest.NewRecorder()
-				req, err := http.NewRequest("POST", "localhost:8080/updates", strings.NewReader(string(gziparrMetrics)))
+				req, err := http.NewRequest("POST", fmt.Sprintf("%s/updates", a.cfg.Address),
+					strings.NewReader(string(gziparrMetrics)))
 				if err != nil {
 					t.Fatal(err)
 				}

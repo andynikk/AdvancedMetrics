@@ -131,6 +131,7 @@ import (
 	"strings"
 
 	"github.com/andynikk/advancedmetrics/internal/banosexit"
+
 	"github.com/gostaticanalysis/comment/passes/commentmap"
 	"github.com/salihzain/tagalyzer"
 	"golang.org/x/tools/go/analysis"
