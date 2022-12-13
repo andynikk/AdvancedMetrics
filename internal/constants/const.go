@@ -14,13 +14,16 @@ const (
 	TimeLivingCertificateMounth = 0
 	TimeLivingCertificateDay    = 0
 
-	AddressServer       = "localhost:8080"
-	ReportInterval      = 10
-	PollInterval        = 2
-	StoreInterval       = 300000000000
-	StoreFile           = "/tmp/devops-metrics-db.json"
-	Restore             = true
-	ButchSize           = 10
+	AddressServer  = "localhost:8080"
+	ReportInterval = 10
+	PollInterval   = 2
+	StoreInterval  = 300000000000
+	StoreFile      = "/tmp/devops-metrics-db.json"
+	Restore        = true
+	ButchSize      = 10
+
+	TypeEncryption = "sha512"
+
 	QueryInsertTemplate = `INSERT INTO 
 						metrics.store ("ID", "MType", "Value", "Delta", "Hash") 
 					VALUES

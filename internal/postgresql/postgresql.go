@@ -205,26 +205,3 @@ func (atm arrTransitMetrics) find(mtype string, id string) bool {
 	}
 	return false
 }
-
-func InitStoreData(mtype string, id string) bool {
-	//mapTypeStore := rs.Config.TypeMetricsStorage
-	//if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; findKey {
-	//	ctx := context.Background()
-	//
-	//	dbc, err := postgresql.PoolDB(rs.Config.DatabaseDsn)
-	//	if err != nil {
-	//		constants.Logger.ErrorLog(err)
-	//	}
-	//
-	//	mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataDB{
-	//		DBC: *dbc, Ctx: ctx, DBDsn: rs.Config.DatabaseDsn,
-	//	}
-	//	if ok := mapTypeStore[constants.MetricsStorageDB.String()].CreateTable(); !ok {
-	//		constants.Logger.ErrorLog(err)
-	//	}
-	//}
-	//if _, findKey := mapTypeStore[constants.MetricsStorageFile.String()]; findKey {
-	//	mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataFile{StoreFile: rs.Config.StoreFile}
-	//}
-	return false
-}

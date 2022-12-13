@@ -39,8 +39,8 @@ const (
 // RepStore структура для настроек сервера, роутера и хранилище метрик.
 // Хранилище метрик защищено sync.Mutex
 type RepStore struct {
-	Config environment.ServerConfig
-	PK     *encryption.RsaPrivateKey
+	Config *environment.ServerConfig
+	PK     *encryption.KeyEncryption
 	Router *mux.Router
 	sync.Mutex
 	repository.MapMetrics
@@ -61,7 +61,7 @@ func NewRepStore(rs *RepStore) {
 
 	InitRoutersMux(rs)
 
-	rs.Config, _ = environment.InitConfigServer()
+	rs.Config = environment.InitConfigServer()
 	rs.PK, _ = encryption.InitPrivateKey(rs.Config.CryptoKey)
 
 	rs.Config.TypeMetricsStorage, _ = repository.InitStoreDB(rs.Config.TypeMetricsStorage, rs.Config.DatabaseDsn)
@@ -250,7 +250,7 @@ func (rs *RepStore) HandlerUpdateMetricJSON(rw http.ResponseWriter, rq *http.Req
 		return
 	}
 
-	if strings.Contains(contentEncryption, "sha") {
+	if strings.Contains(contentEncryption, constants.TypeEncryption) {
 		bytBody, err = rs.PK.RsaDecrypt(bytBody)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
@@ -321,7 +321,7 @@ func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Re
 		return
 	}
 
-	if strings.Contains(contentEncryption, "sha") {
+	if strings.Contains(contentEncryption, constants.TypeEncryption) {
 		bytBody, err = rs.PK.RsaDecrypt(bytBody)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
@@ -385,7 +385,7 @@ func (rs *RepStore) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Req
 		return
 	}
 
-	if strings.Contains(contentEncryption, "sha") {
+	if strings.Contains(contentEncryption, constants.TypeEncryption) {
 		bytBody, err = rs.PK.RsaDecrypt(bytBody)
 		if err != nil {
 			constants.Logger.ErrorLog(err)

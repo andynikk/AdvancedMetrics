@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,11 +31,6 @@ type MetricsGauge map[string]repository.Gauge
 type emtyArrMetrics []encoding.Metrics
 type MapMetricsButch map[int]emtyArrMetrics
 
-type goRutine struct {
-	ctx context.Context
-	cnf context.CancelFunc
-}
-
 type data struct {
 	sync.RWMutex
 	pollCount    int64
@@ -44,17 +38,16 @@ type data struct {
 }
 
 type agent struct {
-	cfg environment.AgentConfig
-	goRutine
+	cfg           *environment.AgentConfig
+	KeyEncryption *encryption.KeyEncryption
 	data
-	*rsa.PublicKey
 }
 
 var buildVersion = "N/A"
 var buildDate = "N/A"
 var buildCommit = "N/A"
 
-func (eam *emtyArrMetrics) prepareMetrics(key *encryption.RsaPublicKey) ([]byte, error) {
+func (eam *emtyArrMetrics) prepareMetrics(key *encryption.KeyEncryption) ([]byte, error) {
 	arrMetrics, err := json.MarshalIndent(eam, "", " ")
 	if err != nil {
 		return nil, err
@@ -116,8 +109,11 @@ func (a *agent) fillMetric() {
 }
 
 func (a *agent) metrixOtherScan() {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+
 	cpuUtilization, _ := cpu.Percent(2*time.Second, false)
-	swapMemory, err := mem.SwapMemoryWithContext(a.ctx)
+	swapMemory, err := mem.SwapMemoryWithContext(ctx)
 	if err != nil {
 		constants.Logger.ErrorLog(err)
 	}
@@ -135,7 +131,7 @@ func (a *agent) metrixOtherScan() {
 	a.data.Unlock()
 }
 
-func (a *agent) goMetrixOtherScan() {
+func (a *agent) goMetrixOtherScan(ctx context.Context, cancelFunc context.CancelFunc) {
 
 	saveTicker := time.NewTicker(a.cfg.PollInterval)
 	for {
@@ -144,14 +140,14 @@ func (a *agent) goMetrixOtherScan() {
 
 			a.metrixOtherScan()
 
-		case <-a.ctx.Done():
-			a.cnf()
+		case <-ctx.Done():
+			cancelFunc()
 			return
 		}
 	}
 }
 
-func (a *agent) goMetrixScan() {
+func (a *agent) goMetrixScan(ctx context.Context, cancelFunc context.CancelFunc) {
 
 	saveTicker := time.NewTicker(a.cfg.PollInterval)
 	for {
@@ -160,8 +156,8 @@ func (a *agent) goMetrixScan() {
 
 			a.fillMetric()
 
-		case <-a.ctx.Done():
-			a.cnf()
+		case <-ctx.Done():
+			cancelFunc()
 			return
 		}
 	}
@@ -180,8 +176,8 @@ func (a *agent) Post2Server(allMterics []byte) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
-	if a.PublicKey != nil {
-		req.Header.Set("Content-Encryption", "sha512")
+	if a.KeyEncryption.PublicKey != nil {
+		req.Header.Set("Content-Encryption", a.KeyEncryption.TypeEncryption)
 	}
 
 	defer req.Body.Close()
@@ -200,9 +196,8 @@ func (a *agent) Post2Server(allMterics []byte) error {
 func (a *agent) goPost2Server(matricsButch *MapMetricsButch) error {
 
 	for _, allMetrics := range *matricsButch {
-		rsaPublicKey := &encryption.RsaPublicKey{PublicKey: a.PublicKey}
 
-		gziparrMetrics, err := allMetrics.prepareMetrics(rsaPublicKey)
+		gziparrMetrics, err := allMetrics.prepareMetrics(a.KeyEncryption)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return err
@@ -260,7 +255,7 @@ func (a *agent) SendMetricsServer() (MapMetricsButch, error) {
 	return mapMatricsButch, nil
 }
 
-func (a *agent) goMakeRequest() {
+func (a *agent) goMakeRequest(ctx context.Context, cancelFunc context.CancelFunc) {
 
 	reportTicker := time.NewTicker(a.cfg.ReportInterval)
 
@@ -269,9 +264,12 @@ func (a *agent) goMakeRequest() {
 		case <-reportTicker.C:
 			mapAllMetrics, _ := a.SendMetricsServer()
 			go a.goPost2Server(&mapAllMetrics)
-		case <-a.ctx.Done():
-			a.cnf()
+
+		case <-ctx.Done():
+
+			cancelFunc()
 			return
+
 		}
 	}
 }
@@ -282,27 +280,23 @@ func main() {
 	fmt.Println(fmt.Sprintf("Build date: %s", buildDate))
 	fmt.Println(fmt.Sprintf("Build commit: %s", buildCommit))
 
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	cfgA := environment.InitConfigAgent()
-
-	certPublicKey, _ := encryption.InitPublicKey(cfgA.CryptoKey)
+	configAgent := environment.InitConfigAgent()
+	certPublicKey, _ := encryption.InitPublicKey(configAgent.CryptoKey)
 
 	a := agent{
-		cfg: cfgA,
+		cfg: configAgent,
 		data: data{
 			pollCount:    0,
 			metricsGauge: make(MetricsGauge),
 		},
-		goRutine: goRutine{
-			ctx: ctx,
-			cnf: cancelFunc,
-		},
-		PublicKey: certPublicKey,
+		KeyEncryption: certPublicKey,
 	}
 
-	go a.goMetrixScan()
-	go a.goMetrixOtherScan()
-	go a.goMakeRequest()
+	ctx, cancelFunc := context.WithCancel(context.Background())
+
+	go a.goMetrixScan(ctx, cancelFunc)
+	go a.goMetrixOtherScan(ctx, cancelFunc)
+	go a.goMakeRequest(ctx, cancelFunc)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)

@@ -36,7 +36,7 @@ func TestFuncServer(t *testing.T) {
 	})
 
 	t.Run("Checking init config", func(t *testing.T) {
-		rp.Config, _ = environment.InitConfigServer()
+		rp.Config = environment.InitConfigServer()
 		if rp.Config.Address == "" {
 			t.Errorf("Error checking init config")
 		}
@@ -63,14 +63,12 @@ func TestFuncServer(t *testing.T) {
 		t.Run("Checking rsa encrypt", func(t *testing.T) {
 			testMsg := "Тестовое сообщение"
 
-			rsaPublicKey := encryption.RsaPublicKey{PublicKey: &rp.PK.PrivateKey.PublicKey}
-			encryptMsg, err := rsaPublicKey.RsaEncrypt([]byte(testMsg))
+			encryptMsg, err := rp.PK.RsaEncrypt([]byte(testMsg))
 			if err != nil {
 				t.Errorf("Error checking rsa encrypt")
 			}
 			t.Run("Checking rsa decrypt", func(t *testing.T) {
-				rsaPrivateKey := encryption.RsaPrivateKey{PrivateKey: rp.PK.PrivateKey}
-				decryptMsg, err := rsaPrivateKey.RsaDecrypt(encryptMsg)
+				decryptMsg, err := rp.PK.RsaDecrypt(encryptMsg)
 				if err != nil {
 					t.Errorf("Error checking rsa decrypt")
 				}

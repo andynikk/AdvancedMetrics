@@ -72,15 +72,13 @@ func TestFuncAgen(t *testing.T) {
 
 	t.Run("Checking rsa crypt", func(t *testing.T) {
 		t.Run("Checking init crypto key", func(t *testing.T) {
-			a.PublicKey, _ = encryption.InitPublicKey(a.cfg.CryptoKey)
-			if a.cfg.CryptoKey != "" && a.PublicKey == nil {
+			a.KeyEncryption, _ = encryption.InitPublicKey(a.cfg.CryptoKey)
+			if a.cfg.CryptoKey != "" && a.KeyEncryption.PublicKey == nil {
 				t.Errorf("Error checking init crypto key")
 			}
 			t.Run("Checking rsa encrypt", func(t *testing.T) {
 				testMsg := "Тестовое сообщение"
-
-				rsaPublicKey := encryption.RsaPublicKey{PublicKey: a.PublicKey}
-				_, err := rsaPublicKey.RsaEncrypt([]byte(testMsg))
+				_, err := a.KeyEncryption.RsaEncrypt([]byte(testMsg))
 				if err != nil {
 					t.Errorf("Error checking rsa encrypt")
 				}
@@ -123,9 +121,8 @@ func TestFuncAgen(t *testing.T) {
 		}
 		t.Run("Send metrics to server", func(t *testing.T) {
 			for _, allMetrics := range mapMetricsButch {
-				rsaPublicKey := &encryption.RsaPublicKey{PublicKey: a.PublicKey}
 
-				gziparrMetrics, err := allMetrics.prepareMetrics(rsaPublicKey)
+				gziparrMetrics, err := allMetrics.prepareMetrics(a.KeyEncryption)
 				if err != nil {
 					constants.Logger.ErrorLog(err)
 					t.Errorf("Send metrics to server")
@@ -176,6 +173,8 @@ func TestFuncAgen(t *testing.T) {
 
 func BenchmarkSendMetrics(b *testing.B) {
 	a := agent{}
+	ac := &environment.AgentConfig{}
+	a.cfg = ac
 	a.cfg.Address = "localhost:8080"
 
 	wg := sync.WaitGroup{}
