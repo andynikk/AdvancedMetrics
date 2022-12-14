@@ -24,14 +24,6 @@ type KeyEncryption struct {
 	PrivateKey     *rsa.PrivateKey
 }
 
-//type RsaPublicKey struct {
-//	*rsa.PublicKey
-//}
-//
-//type RsaPrivateKey struct {
-//	*rsa.PrivateKey
-//}
-
 func (ke *KeyEncryption) RsaEncrypt(msg []byte) ([]byte, error) {
 	encryptedBytes, err := rsa.EncryptOAEP(sha512.New512_256(), rand.Reader, ke.PublicKey, msg, nil)
 	return encryptedBytes, err
