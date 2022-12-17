@@ -3,7 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -15,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 
@@ -44,13 +48,14 @@ type agent struct {
 	cfg environment.AgentConfig
 	goRutine
 	data
+	*rsa.PublicKey
 }
 
 var buildVersion = "N/A"
 var buildDate = "N/A"
 var buildCommit = "N/A"
 
-func (eam *emtyArrMetrics) prepareMetrics() ([]byte, error) {
+func (eam *emtyArrMetrics) prepareMetrics(key *encryption.RsaPublicKey) ([]byte, error) {
 	arrMetrics, err := json.MarshalIndent(eam, "", " ")
 	if err != nil {
 		return nil, err
@@ -61,7 +66,12 @@ func (eam *emtyArrMetrics) prepareMetrics() ([]byte, error) {
 		return nil, err
 	}
 
-	return gziparrMetrics, nil
+	encryptedArrMetrics, err := key.RsaEncrypt(gziparrMetrics)
+	if err != nil {
+		return nil, err
+	}
+
+	return encryptedArrMetrics, nil
 }
 
 func (a *agent) fillMetric(mems *runtime.MemStats) {
@@ -152,6 +162,7 @@ func (a *agent) metrixScan() {
 func (a *agent) Post2Server(allMterics []byte) error {
 
 	addressPost := fmt.Sprintf("http://%s/updates", a.cfg.Address)
+
 	req, err := http.NewRequest("POST", addressPost, bytes.NewReader(allMterics))
 	if err != nil {
 
@@ -161,6 +172,8 @@ func (a *agent) Post2Server(allMterics []byte) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Content-Encryption", "sha512")
+
 	defer req.Body.Close()
 
 	client := &http.Client{}
@@ -175,7 +188,9 @@ func (a *agent) Post2Server(allMterics []byte) error {
 }
 
 func (a *agent) goPost2Server(allMetrics emtyArrMetrics) error {
-	gziparrMetrics, err := allMetrics.prepareMetrics()
+	rsaPublicKey := &encryption.RsaPublicKey{PublicKey: a.PublicKey}
+
+	gziparrMetrics, err := allMetrics.prepareMetrics(rsaPublicKey)
 	if err != nil {
 		constants.Logger.ErrorLog(err)
 		return err
@@ -240,13 +255,20 @@ func (a *agent) MakeRequest() {
 
 func main() {
 
-	fmt.Println(fmt.Sprintf("Build version: <%s>", buildVersion))
-	fmt.Println(fmt.Sprintf("Build date: <%s>", buildDate))
-	fmt.Println(fmt.Sprintf("Build commit: <%s>", buildCommit))
+	fmt.Println(fmt.Sprintf("Build version: %s", buildVersion))
+	fmt.Println(fmt.Sprintf("Build date: %s", buildDate))
+	fmt.Println(fmt.Sprintf("Build commit: %s", buildCommit))
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
+	cfgA := environment.SetConfigAgent()
+
+	certData, _ := os.ReadFile(cfgA.CryptoKey)
+	certBlock, _ := pem.Decode(certData)
+	cert, _ := x509.ParseCertificate(certBlock.Bytes)
+	certPublicKey := cert.PublicKey.(*rsa.PublicKey)
+
 	a := agent{
-		cfg: environment.SetConfigAgent(),
+		cfg: cfgA,
 		data: data{
 			pollCount:    0,
 			metricsGauge: make(MetricsGauge),
@@ -255,6 +277,7 @@ func main() {
 			ctx: ctx,
 			cnf: cancelFunc,
 		},
+		PublicKey: certPublicKey,
 	}
 
 	go a.metrixScan()
@@ -264,5 +287,4 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	<-stop
-
 }

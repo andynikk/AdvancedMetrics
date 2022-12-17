@@ -18,6 +18,7 @@ type AgentConfigENV struct {
 	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
 	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2s"`
 	Key            string        `env:"KEY"`
+	CryptoKey      string        `env:"CRYPTO_KEY"`
 }
 
 type AgentConfig struct {
@@ -25,6 +26,7 @@ type AgentConfig struct {
 	ReportInterval time.Duration
 	PollInterval   time.Duration
 	Key            string
+	CryptoKey      string
 }
 
 type ServerConfigENV struct {
@@ -34,6 +36,7 @@ type ServerConfigENV struct {
 	Restore       bool          `env:"RESTORE" envDefault:"true"`
 	Key           string        `env:"KEY"`
 	DatabaseDsn   string        `env:"DATABASE_DSN"`
+	CryptoKey     string        `env:"CRYPTO_KEY"`
 }
 
 type ServerConfig struct {
@@ -44,6 +47,7 @@ type ServerConfig struct {
 	Key                string
 	DatabaseDsn        string
 	TypeMetricsStorage repository.MapTypeStore
+	CryptoKey          string
 }
 
 func SetConfigAgent() AgentConfig {
@@ -51,6 +55,7 @@ func SetConfigAgent() AgentConfig {
 	reportIntervalPtr := flag.Duration("r", constants.ReportInterval*time.Second, "интервал отправки на сервер")
 	pollIntervalPtr := flag.Duration("p", constants.PollInterval*time.Second, "интервал сбора метрик")
 	keyFlag := flag.String("k", "", "ключ хеширования")
+	cryptoKeyFlag := flag.String("crypto-key", "", "файл с криптоключем")
 	flag.Parse()
 
 	var cfgENV AgentConfigENV
@@ -87,13 +92,20 @@ func SetConfigAgent() AgentConfig {
 		keyHash = *keyFlag
 	}
 
+	patchCryptoKey := ""
+	if _, ok := os.LookupEnv("CRYPTO_KEY"); ok {
+		patchCryptoKey = cfgENV.CryptoKey
+	} else {
+		patchCryptoKey = *cryptoKeyFlag
+	}
+
 	return AgentConfig{
 		Address:        addressServ,
 		ReportInterval: reportIntervalMetric,
 		PollInterval:   pollIntervalMetrics,
 		Key:            keyHash,
+		CryptoKey:      patchCryptoKey,
 	}
-
 }
 
 func SetConfigServer() ServerConfig {
@@ -104,6 +116,8 @@ func SetConfigServer() ServerConfig {
 	storeFilePtr := flag.String("f", constants.StoreFile, "путь к файлу метрик")
 	keyFlag := flag.String("k", "", "ключ хеша")
 	keyDatabaseDsn := flag.String("d", "", "строка соединения с базой")
+	cryptoKeyFlag := flag.String("crypto-key", "", "файл с криптоключем")
+
 	flag.Parse()
 
 	var cfgENV ServerConfigENV
@@ -142,6 +156,13 @@ func SetConfigServer() ServerConfig {
 		databaseDsn = *keyDatabaseDsn
 	}
 
+	patchCryptoKey := ""
+	if _, ok := os.LookupEnv("CRYPTO_KEY"); ok {
+		patchCryptoKey = cfgENV.CryptoKey
+	} else {
+		patchCryptoKey = *cryptoKeyFlag
+	}
+
 	MapTypeStore := make(repository.MapTypeStore)
 
 	if databaseDsn != "" {
@@ -162,5 +183,6 @@ func SetConfigServer() ServerConfig {
 		Key:                keyHash,
 		DatabaseDsn:        databaseDsn,
 		TypeMetricsStorage: MapTypeStore,
+		CryptoKey:          patchCryptoKey,
 	}
 }
