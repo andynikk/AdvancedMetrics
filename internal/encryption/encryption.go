@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -17,21 +18,19 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/constants"
 )
 
-type RsaPublicKey struct {
-	*rsa.PublicKey
+type KeyEncryption struct {
+	TypeEncryption string
+	PublicKey      *rsa.PublicKey
+	PrivateKey     *rsa.PrivateKey
 }
 
-type RsaPrivateKey struct {
-	*rsa.PrivateKey
-}
-
-func (rk *RsaPublicKey) RsaEncrypt(msg []byte) ([]byte, error) {
-	encryptedBytes, err := rsa.EncryptOAEP(sha512.New512_256(), rand.Reader, rk.PublicKey, msg, nil)
+func (ke *KeyEncryption) RsaEncrypt(msg []byte) ([]byte, error) {
+	encryptedBytes, err := rsa.EncryptOAEP(sha512.New512_256(), rand.Reader, ke.PublicKey, msg, nil)
 	return encryptedBytes, err
 }
 
-func (rk *RsaPrivateKey) RsaDecrypt(msgByte []byte) ([]byte, error) {
-	decryptedBytes, err := rk.PrivateKey.Decrypt(nil, msgByte, &rsa.OAEPOptions{Hash: crypto.SHA512_256})
+func (ke *KeyEncryption) RsaDecrypt(msgByte []byte) ([]byte, error) {
+	decryptedBytes, err := ke.PrivateKey.Decrypt(nil, msgByte, &rsa.OAEPOptions{Hash: crypto.SHA512_256})
 	return decryptedBytes, err
 }
 
@@ -106,4 +105,29 @@ func SaveKeyInFile(key *bytes.Buffer, pathFile string) {
 	if err != nil {
 		return
 	}
+}
+
+func InitPrivateKey(cryptoKeyPath string) (*KeyEncryption, error) {
+
+	if cryptoKeyPath == "" {
+		return nil, errors.New("путь к приватному ключу не указан")
+	}
+	pvkData, _ := os.ReadFile(cryptoKeyPath)
+	pvkBlock, _ := pem.Decode(pvkData)
+	pvk, err := x509.ParsePKCS1PrivateKey(pvkBlock.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return &KeyEncryption{TypeEncryption: constants.TypeEncryption, PrivateKey: pvk, PublicKey: &pvk.PublicKey}, nil
+}
+
+func InitPublicKey(cryptoKeyPath string) (*KeyEncryption, error) {
+	if cryptoKeyPath == "" {
+		return nil, errors.New("не указан путь к публичному ключу")
+	}
+	certData, _ := os.ReadFile(cryptoKeyPath)
+	certBlock, _ := pem.Decode(certData)
+	cert, _ := x509.ParseCertificate(certBlock.Bytes)
+	certPublicKey := cert.PublicKey.(*rsa.PublicKey)
+	return &KeyEncryption{TypeEncryption: constants.TypeEncryption, PublicKey: certPublicKey}, nil
 }

@@ -7,28 +7,24 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/pprof"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/gorilla/mux"
 
 	"github.com/andynikk/advancedmetrics/internal/compression"
 	"github.com/andynikk/advancedmetrics/internal/constants"
 	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
+	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
-	"github.com/andynikk/advancedmetrics/internal/postgresql"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 
@@ -43,8 +39,8 @@ const (
 // RepStore структура для настроек сервера, роутера и хранилище метрик.
 // Хранилище метрик защищено sync.Mutex
 type RepStore struct {
-	Config environment.ServerConfig
-	PK     *encryption.RsaPrivateKey
+	Config *environment.ServerConfig
+	PK     *encryption.KeyEncryption
 	Router *mux.Router
 	sync.Mutex
 	repository.MapMetrics
@@ -65,35 +61,11 @@ func NewRepStore(rs *RepStore) {
 
 	InitRoutersMux(rs)
 
-	rs.Config = environment.SetConfigServer()
+	rs.Config = environment.InitConfigServer()
+	rs.PK, _ = encryption.InitPrivateKey(rs.Config.CryptoKey)
 
-	pvkData, _ := os.ReadFile(rs.Config.CryptoKey)
-	pvkBlock, _ := pem.Decode(pvkData)
-	pvk, err := x509.ParsePKCS1PrivateKey(pvkBlock.Bytes)
-	if err != nil {
-		constants.Logger.ErrorLog(err)
-	}
-	rs.PK = &encryption.RsaPrivateKey{PrivateKey: pvk}
-
-	mapTypeStore := rs.Config.TypeMetricsStorage
-	if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; findKey {
-		ctx := context.Background()
-
-		dbc, err := postgresql.PoolDB(rs.Config.DatabaseDsn)
-		if err != nil {
-			constants.Logger.ErrorLog(err)
-		}
-
-		mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataDB{
-			DBC: *dbc, Ctx: ctx, DBDsn: rs.Config.DatabaseDsn,
-		}
-		if ok := mapTypeStore[constants.MetricsStorageDB.String()].CreateTable(); !ok {
-			constants.Logger.ErrorLog(err)
-		}
-	}
-	if _, findKey := mapTypeStore[constants.MetricsStorageFile.String()]; findKey {
-		mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataFile{StoreFile: rs.Config.StoreFile}
-	}
+	rs.Config.TypeMetricsStorage, _ = repository.InitStoreDB(rs.Config.TypeMetricsStorage, rs.Config.DatabaseDsn)
+	rs.Config.TypeMetricsStorage, _ = repository.InitStoreFile(rs.Config.TypeMetricsStorage, rs.Config.StoreFile)
 }
 
 // InitRoutersMux создание роутера.
@@ -278,7 +250,7 @@ func (rs *RepStore) HandlerUpdateMetricJSON(rw http.ResponseWriter, rq *http.Req
 		return
 	}
 
-	if strings.Contains(contentEncryption, "sha") {
+	if strings.Contains(contentEncryption, constants.TypeEncryption) {
 		bytBody, err = rs.PK.RsaDecrypt(bytBody)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
@@ -349,7 +321,7 @@ func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Re
 		return
 	}
 
-	if strings.Contains(contentEncryption, "sha") {
+	if strings.Contains(contentEncryption, constants.TypeEncryption) {
 		bytBody, err = rs.PK.RsaDecrypt(bytBody)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
@@ -381,6 +353,12 @@ func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Re
 		http.Error(rw, "Ошибка распаковки", http.StatusInternalServerError)
 	}
 
+	//for _, val := range storedData {
+	//	if val.ID == "BuckHashSys" {
+	//		fmt.Println(fmt.Sprintf("BuckHashSys: %f", *val.Value))
+	//	}
+	//}
+
 	rs.SetValueInMapJSON(storedData)
 
 	for _, val := range rs.Config.TypeMetricsStorage {
@@ -407,7 +385,7 @@ func (rs *RepStore) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Req
 		return
 	}
 
-	if strings.Contains(contentEncryption, "sha") {
+	if strings.Contains(contentEncryption, constants.TypeEncryption) {
 		bytBody, err = rs.PK.RsaDecrypt(bytBody)
 		if err != nil {
 			constants.Logger.ErrorLog(err)

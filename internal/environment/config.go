@@ -32,6 +32,7 @@ type AgentConfig struct {
 	PollInterval   time.Duration
 	Key            string
 	CryptoKey      string
+	ConfigFilePath string
 }
 
 type AgentConfigFile struct {
@@ -39,12 +40,6 @@ type AgentConfigFile struct {
 	ReportInterval string `json:"report_interval"`
 	PollInterval   string `json:"poll_interval"`
 	CryptoKey      string `json:"crypto_key"`
-}
-
-type AgentConfigDefault struct {
-	Address        string
-	ReportInterval time.Duration
-	PollInterval   time.Duration
 }
 
 type ServerConfigENV struct {
@@ -67,6 +62,7 @@ type ServerConfig struct {
 	DatabaseDsn        string
 	TypeMetricsStorage repository.MapTypeStore
 	CryptoKey          string
+	ConfigFilePath     string
 }
 
 type ServerConfigFile struct {
@@ -109,9 +105,9 @@ func ParsCfgByte(res []byte) bytes.Buffer {
 
 		if configLines[i] != "" {
 			var strs string
-			splitStr := strings.SplitAfterN(configLines[i], "//", -1)
+			splitStr := strings.SplitAfterN(configLines[i], "// ", -1)
 			if len(splitStr) != 0 {
-				strs = strings.Replace(splitStr[0], "//", "\n", -1)
+				strs = strings.Replace(splitStr[0], "// ", "\n", -1)
 				out.WriteString(strs)
 			}
 		}
@@ -141,7 +137,63 @@ func GetAgentConfigFile(file *string) AgentConfigFile {
 
 }
 
-func SetConfigAgent() AgentConfig {
+func InitConfigAgent() *AgentConfig {
+	configAgent := AgentConfig{}
+	configAgent.InitConfigAgentENV()
+	configAgent.InitConfigAgentFlag()
+	configAgent.InitConfigAgentFile()
+	configAgent.InitConfigAgentDefault()
+
+	return &configAgent
+}
+
+func (ac *AgentConfig) InitConfigAgentENV() {
+
+	var cfgENV AgentConfigENV
+	err := env.Parse(&cfgENV)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	pathFileCfg := ""
+	if _, ok := os.LookupEnv("CONFIG"); ok {
+		pathFileCfg = cfgENV.Config
+	}
+
+	addressServ := ""
+	if _, ok := os.LookupEnv("ADDRESS"); ok {
+		addressServ = cfgENV.Address
+	}
+
+	var reportIntervalMetric time.Duration
+	if _, ok := os.LookupEnv("REPORT_INTERVAL"); ok {
+		reportIntervalMetric = cfgENV.ReportInterval
+	}
+
+	var pollIntervalMetrics time.Duration
+	if _, ok := os.LookupEnv("POLL_INTERVAL"); ok {
+		pollIntervalMetrics = cfgENV.PollInterval
+	}
+
+	keyHash := ""
+	if _, ok := os.LookupEnv("KEY"); ok {
+		keyHash = cfgENV.Key
+	}
+
+	patchCryptoKey := ""
+	if _, ok := os.LookupEnv("CRYPTO_KEY"); ok {
+		patchCryptoKey = cfgENV.CryptoKey
+	}
+
+	ac.Address = addressServ
+	ac.ReportInterval = reportIntervalMetric
+	ac.PollInterval = pollIntervalMetrics
+	ac.Key = keyHash
+	ac.CryptoKey = patchCryptoKey
+	ac.ConfigFilePath = pathFileCfg
+}
+
+func (ac *AgentConfig) InitConfigAgentFlag() {
 
 	addressPtr := flag.String("a", "", "имя сервера")
 	reportIntervalPtr := flag.Duration("r", 0, "интервал отправки на сервер")
@@ -153,82 +205,75 @@ func SetConfigAgent() AgentConfig {
 
 	flag.Parse()
 
-	var cfgENV AgentConfigENV
-	err := env.Parse(&cfgENV)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	pathFileCfg := ""
 	if *fileCfg != "" {
 		pathFileCfg = *fileCfg
 	} else if *fileCfgC != "" {
 		pathFileCfg = *fileCfgC
 	}
-	if _, ok := os.LookupEnv("CONFIG"); ok {
-		pathFileCfg = cfgENV.Config
-	} else {
-		pathFileCfg = pathFileCfg
+
+	if ac.Address == "" {
+		ac.Address = *addressPtr
+	}
+	if ac.ReportInterval == 0 {
+		ac.ReportInterval = *reportIntervalPtr
+	}
+	if ac.PollInterval == 0 {
+		ac.PollInterval = *pollIntervalPtr
+	}
+	if ac.Key == "" {
+		ac.Key = *keyFlag
+	}
+	if ac.CryptoKey == "" {
+		ac.CryptoKey = *cryptoKeyFlag
+	}
+	if ac.ConfigFilePath == "" {
+		ac.ConfigFilePath = pathFileCfg
+	}
+}
+
+func (ac *AgentConfig) InitConfigAgentFile() {
+
+	if ac.ConfigFilePath == "" {
+		return
 	}
 
 	var jsonCfg AgentConfigFile
-	jsonCfg = GetAgentConfigFile(&pathFileCfg)
+	jsonCfg = GetAgentConfigFile(&ac.ConfigFilePath)
 
-	addressServ := ""
-	if _, ok := os.LookupEnv("ADDRESS"); ok {
-		addressServ = cfgENV.Address
-	} else if *addressPtr != "" {
-		addressServ = *addressPtr
-	} else if jsonCfg.Address != "" {
-		addressServ = jsonCfg.Address
-	} else {
-		addressServ = constants.AddressServer
+	addressServ := jsonCfg.Address
+	reportIntervalMetric, _ := time.ParseDuration(jsonCfg.ReportInterval)
+	pollIntervalMetrics, _ := time.ParseDuration(jsonCfg.PollInterval)
+	patchCryptoKey := jsonCfg.CryptoKey
+
+	if ac.Address == "" {
+		ac.Address = addressServ
 	}
-
-	var reportIntervalMetric time.Duration
-	if _, ok := os.LookupEnv("REPORT_INTERVAL"); ok {
-		reportIntervalMetric = cfgENV.ReportInterval
-	} else if *reportIntervalPtr != 0 {
-		reportIntervalMetric = *reportIntervalPtr
-	} else if rmi, _ := time.ParseDuration(jsonCfg.ReportInterval); rmi != 0 {
-		reportIntervalMetric = rmi
-	} else {
-		reportIntervalMetric = constants.ReportInterval * time.Second
+	if ac.ReportInterval == 0 {
+		ac.ReportInterval = reportIntervalMetric
 	}
-
-	var pollIntervalMetrics time.Duration
-	if _, ok := os.LookupEnv("POLL_INTERVAL"); ok {
-		pollIntervalMetrics = cfgENV.PollInterval
-	} else if *pollIntervalPtr != 0 {
-		pollIntervalMetrics = *pollIntervalPtr
-	} else if pi, _ := time.ParseDuration(jsonCfg.PollInterval); pi != 0 {
-		pollIntervalMetrics = pi
-	} else {
-		pollIntervalMetrics = constants.PollInterval * time.Second
+	if ac.PollInterval == 0 {
+		ac.PollInterval = pollIntervalMetrics
 	}
-
-	keyHash := ""
-	if _, ok := os.LookupEnv("KEY"); ok {
-		keyHash = cfgENV.Key
-	} else {
-		keyHash = *keyFlag
+	if ac.CryptoKey == "" {
+		ac.CryptoKey = patchCryptoKey
 	}
+}
 
-	patchCryptoKey := ""
-	if _, ok := os.LookupEnv("CRYPTO_KEY"); ok {
-		patchCryptoKey = cfgENV.CryptoKey
-	} else if *cryptoKeyFlag != "" {
-		patchCryptoKey = *cryptoKeyFlag
-	} else {
-		patchCryptoKey = jsonCfg.CryptoKey
+func (ac *AgentConfig) InitConfigAgentDefault() {
+
+	addressServ := constants.AddressServer
+	reportIntervalMetric := constants.ReportInterval * time.Second
+	pollIntervalMetrics := constants.PollInterval * time.Second
+
+	if ac.Address == "" {
+		ac.Address = addressServ
 	}
-
-	return AgentConfig{
-		Address:        addressServ,
-		ReportInterval: reportIntervalMetric,
-		PollInterval:   pollIntervalMetrics,
-		Key:            keyHash,
-		CryptoKey:      patchCryptoKey,
+	if ac.ReportInterval == 0 {
+		ac.ReportInterval = reportIntervalMetric
+	}
+	if ac.PollInterval == 0 {
+		ac.PollInterval = pollIntervalMetrics
 	}
 }
 
@@ -255,11 +300,91 @@ func GetServerConfigFile(file *string) ServerConfigFile {
 
 }
 
-func SetConfigServer() ServerConfig {
+func InitConfigServer() *ServerConfig {
+	constants.Logger.Log = zerolog.New(os.Stdout).Level(zerolog.InfoLevel)
+
+	sc := ServerConfig{}
+	sc.InitConfigServerENV()
+	sc.InitConfigServerFlag()
+	sc.InitConfigServerFile()
+	sc.InitConfigServerDefault()
+
+	return &sc
+}
+
+func (sc *ServerConfig) InitConfigServerENV() {
+
+	var cfgENV ServerConfigENV
+	err := env.Parse(&cfgENV)
+	if err != nil {
+		return
+	}
+
+	var addressServ string
+	if _, ok := os.LookupEnv("ADDRESS"); ok {
+		addressServ = cfgENV.Address
+	}
+
+	var restoreMetric bool
+	if _, ok := os.LookupEnv("RESTORE"); ok {
+		restoreMetric = cfgENV.Restore
+	}
+
+	var storeIntervalMetrics time.Duration
+	if _, ok := os.LookupEnv("STORE_INTERVAL"); ok {
+		storeIntervalMetrics = cfgENV.StoreInterval
+	}
+
+	var storeFileMetrics string
+	if _, ok := os.LookupEnv("STORE_FILE"); ok {
+		storeFileMetrics = cfgENV.StoreFile
+	}
+
+	keyHash := cfgENV.Key
+	if _, ok := os.LookupEnv("KEY"); !ok {
+		keyHash = cfgENV.Key
+	}
+
+	var databaseDsn string
+	if _, ok := os.LookupEnv("DATABASE_DSN"); ok {
+		databaseDsn = cfgENV.DatabaseDsn
+	}
+
+	var patchCryptoKey string
+	if _, ok := os.LookupEnv("CRYPTO_KEY"); ok {
+		patchCryptoKey = cfgENV.CryptoKey
+	}
+
+	var patchFileConfig string
+	if _, ok := os.LookupEnv("CONFIG"); ok {
+		patchFileConfig = cfgENV.Config
+	}
+
+	MapTypeStore := make(repository.MapTypeStore)
+	if databaseDsn != "" {
+		typeDB := repository.TypeStoreDataDB{}
+		MapTypeStore[constants.MetricsStorageDB.String()] = &typeDB
+	} else if storeFileMetrics != "" {
+		typeFile := repository.TypeStoreDataFile{}
+		MapTypeStore[constants.MetricsStorageFile.String()] = &typeFile
+	}
+
+	sc.StoreInterval = storeIntervalMetrics
+	sc.StoreFile = storeFileMetrics
+	sc.Restore = restoreMetric
+	sc.Address = addressServ
+	sc.Key = keyHash
+	sc.DatabaseDsn = databaseDsn
+	sc.TypeMetricsStorage = MapTypeStore
+	sc.CryptoKey = patchCryptoKey
+	sc.ConfigFilePath = patchFileConfig
+}
+
+func (sc *ServerConfig) InitConfigServerFlag() {
 
 	addressPtr := flag.String("a", "", "имя сервера")
 	restorePtr := flag.Bool("r", false, "восстанавливать значения при старте")
-	storeIntervalPtr := flag.Duration("i", constants.StoreInterval, "интервал автосохранения (сек.)")
+	storeIntervalPtr := flag.Duration("i", 0, "интервал автосохранения (сек.)")
 	storeFilePtr := flag.String("f", "", "путь к файлу метрик")
 	keyFlag := flag.String("k", "", "ключ хеша")
 	keyDatabaseDsn := flag.String("d", "", "строка соединения с базой")
@@ -269,114 +394,116 @@ func SetConfigServer() ServerConfig {
 
 	flag.Parse()
 
-	var cfgENV ServerConfigENV
-	err := env.Parse(&cfgENV)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	pathFileCfg := ""
 	if *fileCfg != "" {
 		pathFileCfg = *fileCfg
 	} else if *fileCfgC != "" {
 		pathFileCfg = *fileCfgC
 	}
-	if _, ok := os.LookupEnv("CONFIG"); ok {
-		pathFileCfg = cfgENV.Config
-	} else {
-		pathFileCfg = pathFileCfg
+
+	MapTypeStore := make(repository.MapTypeStore)
+	if len(sc.TypeMetricsStorage) == 0 {
+		if *keyDatabaseDsn != "" {
+			typeDB := repository.TypeStoreDataDB{}
+			MapTypeStore[constants.MetricsStorageDB.String()] = &typeDB
+		} else if *cryptoKeyFlag != "" {
+			typeFile := repository.TypeStoreDataFile{}
+			MapTypeStore[constants.MetricsStorageFile.String()] = &typeFile
+		}
+	}
+
+	if sc.Address == "" {
+		sc.Address = *addressPtr
+	}
+	if sc.StoreInterval == 0 {
+		sc.StoreInterval = *storeIntervalPtr
+	}
+	if sc.StoreFile == "" {
+		sc.StoreFile = *storeFilePtr
+	}
+	if !sc.Restore {
+		sc.Restore = *restorePtr
+	}
+	if sc.Key == "" {
+		sc.Key = *keyFlag
+	}
+	if sc.DatabaseDsn == "" {
+		sc.DatabaseDsn = *keyDatabaseDsn
+	}
+	if sc.CryptoKey == "" {
+		sc.CryptoKey = *cryptoKeyFlag
+	}
+	if sc.ConfigFilePath == "" {
+		sc.ConfigFilePath = pathFileCfg
+	}
+	if len(sc.TypeMetricsStorage) == 0 {
+		sc.TypeMetricsStorage = MapTypeStore
+	}
+}
+
+func (sc *ServerConfig) InitConfigServerFile() {
+
+	if sc.ConfigFilePath == "" {
+		return
 	}
 
 	var jsonCfg ServerConfigFile
-	jsonCfg = GetServerConfigFile(&pathFileCfg)
+	jsonCfg = GetServerConfigFile(&sc.ConfigFilePath)
 
-	var addressServ string
-	if _, ok := os.LookupEnv("ADDRESS"); ok {
-		addressServ = cfgENV.Address
-	} else if *addressPtr != "" {
-		addressServ = *addressPtr
-	} else if jsonCfg.Address != "" {
-		addressServ = jsonCfg.Address
-	} else {
-		addressServ = constants.AddressServer
-	}
-
-	var restoreMetric bool
-	if _, ok := os.LookupEnv("RESTORE"); ok {
-		restoreMetric = cfgENV.Restore
-	} else if *restorePtr {
-		restoreMetric = *restorePtr
-	} else if jsonCfg.Restore {
-		restoreMetric = jsonCfg.Restore
-	} else {
-		restoreMetric = constants.Restore
-	}
-
-	var storeIntervalMetrics time.Duration
-	if _, ok := os.LookupEnv("STORE_INTERVAL"); ok {
-		storeIntervalMetrics = cfgENV.StoreInterval
-	} else if *storeIntervalPtr != 0 {
-		storeIntervalMetrics = *storeIntervalPtr
-	} else if si, _ := time.ParseDuration(jsonCfg.StoreInterval); si != 0 {
-		storeIntervalMetrics = si
-	} else {
-		storeIntervalMetrics = constants.StoreInterval
-	}
-
-	var storeFileMetrics string
-	if _, ok := os.LookupEnv("STORE_FILE"); ok {
-		storeFileMetrics = cfgENV.StoreFile
-	} else if *storeFilePtr != "" {
-		storeFileMetrics = *storeFilePtr
-	} else if jsonCfg.StoreFile != "" {
-		storeFileMetrics = jsonCfg.StoreFile
-	} else {
-		storeFileMetrics = constants.StoreFile
-	}
-
-	keyHash := cfgENV.Key
-	if _, ok := os.LookupEnv("KEY"); !ok {
-		keyHash = *keyFlag
-	}
-
-	var databaseDsn string
-	if _, ok := os.LookupEnv("DATABASE_DSN"); ok {
-		databaseDsn = cfgENV.DatabaseDsn
-	} else if *keyDatabaseDsn != "" {
-		databaseDsn = *keyDatabaseDsn
-	} else {
-		databaseDsn = jsonCfg.StoreFile
-	}
-
-	var patchCryptoKey string
-	if _, ok := os.LookupEnv("CRYPTO_KEY"); ok {
-		patchCryptoKey = cfgENV.CryptoKey
-	} else if *cryptoKeyFlag != "" {
-		patchCryptoKey = *cryptoKeyFlag
-	} else {
-		patchCryptoKey = jsonCfg.CryptoKey
-	}
+	addressServ := jsonCfg.Address
+	restoreMetric := jsonCfg.Restore
+	storeIntervalMetrics, _ := time.ParseDuration(jsonCfg.StoreInterval)
+	storeFileMetrics := jsonCfg.StoreFile
+	databaseDsn := jsonCfg.DatabaseDsn
+	patchCryptoKey := jsonCfg.CryptoKey
 
 	MapTypeStore := make(repository.MapTypeStore)
-
-	if databaseDsn != "" {
-		typeDB := repository.TypeStoreDataDB{}
-		MapTypeStore[constants.MetricsStorageDB.String()] = &typeDB
-	} else if storeFileMetrics != "" {
-		typeFile := repository.TypeStoreDataFile{}
-		MapTypeStore[constants.MetricsStorageFile.String()] = &typeFile
+	if len(sc.TypeMetricsStorage) == 0 {
+		if databaseDsn != "" {
+			typeDB := repository.TypeStoreDataDB{}
+			MapTypeStore[constants.MetricsStorageDB.String()] = &typeDB
+		} else if storeFileMetrics != "" {
+			typeFile := repository.TypeStoreDataFile{}
+			MapTypeStore[constants.MetricsStorageFile.String()] = &typeFile
+		}
 	}
 
-	constants.Logger.Log = zerolog.New(os.Stdout).Level(zerolog.InfoLevel)
-
-	return ServerConfig{
-		StoreInterval:      storeIntervalMetrics,
-		StoreFile:          storeFileMetrics,
-		Restore:            restoreMetric,
-		Address:            addressServ,
-		Key:                keyHash,
-		DatabaseDsn:        databaseDsn,
-		TypeMetricsStorage: MapTypeStore,
-		CryptoKey:          patchCryptoKey,
+	if sc.Address == "" {
+		sc.Address = addressServ
 	}
+	if sc.StoreInterval == 0 {
+		sc.StoreInterval = storeIntervalMetrics
+	}
+	if sc.StoreFile == "" {
+		sc.StoreFile = storeFileMetrics
+	}
+	if !sc.Restore {
+		sc.Restore = restoreMetric
+	}
+	if sc.DatabaseDsn == "" {
+		sc.DatabaseDsn = databaseDsn
+	}
+	if sc.CryptoKey == "" {
+		sc.CryptoKey = patchCryptoKey
+	}
+	if len(sc.TypeMetricsStorage) == 0 {
+		sc.TypeMetricsStorage = MapTypeStore
+	}
+}
+
+func (sc *ServerConfig) InitConfigServerDefault() {
+
+	if sc.Address == "" {
+		sc.Address = constants.AddressServer
+	}
+	if sc.StoreInterval == 0 {
+		sc.StoreInterval = constants.StoreInterval
+	}
+	if sc.StoreFile == "" {
+		sc.StoreFile = constants.StoreFile
+	}
+	if !sc.Restore {
+		sc.Restore = constants.Restore
+	}
+
 }

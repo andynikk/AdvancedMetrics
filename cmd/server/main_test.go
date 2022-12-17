@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,24 +10,40 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gorilla/mux"
-
 	"github.com/andynikk/advancedmetrics/internal/compression"
 	"github.com/andynikk/advancedmetrics/internal/constants"
 	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
+	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/handlers"
-	"github.com/andynikk/advancedmetrics/internal/postgresql"
 	"github.com/andynikk/advancedmetrics/internal/repository"
+	"github.com/gorilla/mux"
 )
 
 func TestFuncServer(t *testing.T) {
 	var fValue float64 = 0.001
 	var iDelta int64 = 10
 
-	var postStr = "http://127.0.0.1:8080/update/gauge/Alloc/0.1\nhttp://127.0.0.1:8080/update/gauge/" +
-		"BuckHashSys/0.002\nhttp://127.0.0.1:8080/update/counter/PollCount/5"
+	rp := new(handlers.RepStore)
+	rp.MutexRepo = make(repository.MutexRepo)
+
+	t.Run("Checking init router", func(t *testing.T) {
+		handlers.InitRoutersMux(rp)
+		if rp.Router == nil {
+			t.Errorf("Error checking init router")
+		}
+	})
+
+	t.Run("Checking init config", func(t *testing.T) {
+		rp.Config = environment.InitConfigServer()
+		if rp.Config.Address == "" {
+			t.Errorf("Error checking init config")
+		}
+	})
+
+	postStr := fmt.Sprintf("http://%s/update/gauge/Alloc/0.1\nhttp://%s/update/gauge/BuckHashSys/0.002"+
+		"\nhttp://%s/update/counter/PollCount/5", rp.Config.Address, rp.Config.Address, rp.Config.Address)
 
 	t.Run("Checking the filling of metrics Gauge", func(t *testing.T) {
 
@@ -38,39 +53,48 @@ func TestFuncServer(t *testing.T) {
 		}
 	})
 
-	rp := new(handlers.RepStore)
-	rp.MutexRepo = make(repository.MutexRepo)
-	handlers.InitRoutersMux(rp)
-	sc := environment.SetConfigServer()
+	t.Run("Checking rsa crypt", func(t *testing.T) {
+		t.Run("Checking init crypto key", func(t *testing.T) {
+			rp.PK, _ = encryption.InitPrivateKey(rp.Config.CryptoKey)
+			if rp.Config.CryptoKey != "" && rp.PK == nil {
+				t.Errorf("Error checking init crypto key")
+			}
+		})
+		t.Run("Checking rsa encrypt", func(t *testing.T) {
+			testMsg := "Тестовое сообщение"
+
+			encryptMsg, err := rp.PK.RsaEncrypt([]byte(testMsg))
+			if err != nil {
+				t.Errorf("Error checking rsa encrypt")
+			}
+			t.Run("Checking rsa decrypt", func(t *testing.T) {
+				decryptMsg, err := rp.PK.RsaDecrypt(encryptMsg)
+				if err != nil {
+					t.Errorf("Error checking rsa decrypt")
+				}
+				byteTestMsg := []byte(testMsg)
+				if bytes.Compare(decryptMsg, byteTestMsg) != 0 {
+					t.Errorf("Error checking rsa decrypt")
+				}
+			})
+		})
+	})
 
 	t.Run("Checking connect DB", func(t *testing.T) {
-		ctx := context.Background()
-
-		dbConn, err := postgresql.PoolDB(sc.DatabaseDsn)
-		if err != nil {
-			t.Errorf("Error create DB connection")
-		}
 		t.Run("Checking create DB table", func(t *testing.T) {
-			mapTypeStore := sc.TypeMetricsStorage
-			mapTypeStore[constants.MetricsStorageDB.String()] = &repository.TypeStoreDataDB{
-				DBC: *dbConn, Ctx: ctx, DBDsn: sc.DatabaseDsn,
+			typeMetricsStorage, err := repository.InitStoreDB(rp.Config.TypeMetricsStorage, rp.Config.DatabaseDsn)
+			if err != nil {
+				t.Errorf(fmt.Sprintf("Error create DB table: %s", err.Error()))
 			}
-			if ok := mapTypeStore[constants.MetricsStorageDB.String()].CreateTable(); !ok {
-				t.Errorf("Error create DB table")
-			}
+			rp.Config.TypeMetricsStorage = typeMetricsStorage
 			t.Run("Checking handlers /ping GET", func(t *testing.T) {
-				ts := httptest.NewServer(rp.Router)
-				defer ts.Close()
-
-				mapTypeStore := sc.TypeMetricsStorage
+				mapTypeStore := rp.Config.TypeMetricsStorage
 				if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
 					t.Errorf("Error handlers /ping GET")
-					return
 				}
 
 				if mapTypeStore[constants.MetricsStorageDB.String()].ConnDB() == nil {
 					t.Errorf("Error handlers /ping GET")
-					return
 				}
 			})
 		})
@@ -81,14 +105,12 @@ func TestFuncServer(t *testing.T) {
 			var c repository.Counter = 58
 			if c.String() != "58" {
 				t.Errorf(`Error method "String" for Counter `)
-				return
 			}
 		})
 		t.Run(`Checking method "String" type "Gauge"`, func(t *testing.T) {
 			var c repository.Gauge = 0.001
 			if c.String() != "0.001" {
 				t.Errorf(`Error method "String" for Counter `)
-				return
 			}
 		})
 		t.Run(`Checking method "GetMetrics" type "Counter"`, func(t *testing.T) {
@@ -105,7 +127,6 @@ func TestFuncServer(t *testing.T) {
 
 			if msg != "MType: counter, ID: TestCounter, Value: 0, Delta: 58, Hash: 29bd8e4bde7ec6302393fe3f7954895a65f4d4b22372d00a35fc1adbcc2ec239" {
 				t.Errorf(`method "GetMetrics" type "Counter"`)
-				return
 			}
 		})
 		t.Run(`Checking method "GetMetrics" type "Gauge"`, func(t *testing.T) {
@@ -121,7 +142,6 @@ func TestFuncServer(t *testing.T) {
 				mt.MType, mt.ID, *mt.Value, 0, mt.Hash)
 			if msg != "MType: gauge, ID: TestGauge, Value: 0.010000, Delta: 0, Hash: 4e5d8a0e257dd12355b15f730591dddd9e45e18a6ef67460a58f20edc12c9465" {
 				t.Errorf(`method "GetMetrics" type "Counter"`)
-				return
 			}
 		})
 		t.Run(`Checking method "Set" type "Counter"`, func(t *testing.T) {
@@ -137,7 +157,6 @@ func TestFuncServer(t *testing.T) {
 
 			if c != 58 {
 				t.Errorf(`Error method "Set" for Counter `)
-				return
 			}
 		})
 		t.Run(`Checking method "Set" type "Gauge"`, func(t *testing.T) {
@@ -153,7 +172,6 @@ func TestFuncServer(t *testing.T) {
 			g.Set(v)
 			if g != 0.01 {
 				t.Errorf(`Error method "Set" for Counter `)
-				return
 			}
 		})
 		t.Run(`Checking method "Type" type "Counter"`, func(t *testing.T) {
@@ -188,13 +206,13 @@ func TestFuncServer(t *testing.T) {
 		t.Run(`Checking method PrepareDataBU`, func(t *testing.T) {
 			valG := repository.Gauge(0)
 			if ok := valG.SetFromText("0.001"); !ok {
-				return
+				t.Errorf(`Error method "PrepareDataBU"`)
 			}
 			rp.MutexRepo["TestGauge"] = &valG
 
 			valC := repository.Counter(0)
 			if ok := valC.SetFromText("58"); !ok {
-				return
+				t.Errorf(`Error method "PrepareDataBU"`)
 			}
 			rp.MutexRepo["TestCounter"] = &valC
 
@@ -214,7 +232,7 @@ func TestFuncServer(t *testing.T) {
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
-				t.Errorf("Error handler //update/{metType}/{metName}/{metValue}/")
+				t.Errorf("Error handler /update/{metType}/{metName}/{metValue}/")
 			}
 			t.Run("Checking handler /value/", func(t *testing.T) {
 				resp := testRequest(t, ts, http.MethodGet, "/value/gauge/TestGauge", nil)
@@ -226,13 +244,12 @@ func TestFuncServer(t *testing.T) {
 			})
 		})
 		//t.Run("Checking handler /updates POST/", func(t *testing.T) {
-		//
-		//	resp := testRequest(t, ts, http.MethodPost, "/updates", nil)
-		//	defer resp.Body.Close()
-		//
-		//	if resp.StatusCode != http.StatusOK {
-		//		t.Errorf("Error handler //update/{metType}/{metName}/{metValue}/")
-		//	}
+		//	//resp := testRequest(t, ts, http.MethodPost, "/updates", nil)
+		//	//defer resp.Body.Close()
+		//	//
+		//	//if resp.StatusCode != http.StatusOK {
+		//	//	t.Errorf("Error handler //update/{metType}/{metName}/{metValue}/")
+		//	//}
 		//})
 		t.Run("Checking handler /update POST/", func(t *testing.T) {
 			testA := testArray("")
@@ -243,7 +260,6 @@ func TestFuncServer(t *testing.T) {
 			body := bytes.NewReader(arrMetrics)
 			resp := testRequest(t, ts, http.MethodPost, "/update", body)
 			defer resp.Body.Close()
-
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Error handler /update POST/")
 			}
@@ -358,7 +374,6 @@ func TestFuncServer(t *testing.T) {
 		txtData := "Test data"
 
 		hashData := cryptohash.HeshSHA256(txtData, configKey)
-		print(len(hashData))
 		if hashData == "" || len(hashData) != 64 {
 			t.Errorf("Error checking Hash SHA 256")
 		}
@@ -395,6 +410,17 @@ func TestFuncServer(t *testing.T) {
 				t.Errorf("Error checking Hash SHA 256")
 			}
 		})
+	})
+
+	t.Run("Checking marshal metrics JSON", func(t *testing.T) {
+
+		for key, val := range rp.MutexRepo {
+			mt := val.GetMetrics(val.Type(), key, rp.Config.Key)
+			_, err := mt.MarshalMetrica()
+			if err != nil {
+				t.Errorf("Error checking marshal metrics JSON")
+			}
+		}
 	})
 }
 
