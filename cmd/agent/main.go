@@ -262,10 +262,13 @@ func main() {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	cfgA := environment.SetConfigAgent()
 
-	certData, _ := os.ReadFile(cfgA.CryptoKey)
-	certBlock, _ := pem.Decode(certData)
-	cert, _ := x509.ParseCertificate(certBlock.Bytes)
-	certPublicKey := cert.PublicKey.(*rsa.PublicKey)
+	certPublicKey := new(rsa.PublicKey)
+	if cfgA.CryptoKey != "" {
+		certData, _ := os.ReadFile(cfgA.CryptoKey)
+		certBlock, _ := pem.Decode(certData)
+		cert, _ := x509.ParseCertificate(certBlock.Bytes)
+		certPublicKey = cert.PublicKey.(*rsa.PublicKey)
+	}
 
 	a := agent{
 		cfg: cfgA,

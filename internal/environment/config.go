@@ -1,9 +1,13 @@
 package environment
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"log"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v6"
@@ -19,6 +23,7 @@ type AgentConfigENV struct {
 	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2s"`
 	Key            string        `env:"KEY"`
 	CryptoKey      string        `env:"CRYPTO_KEY"`
+	Config         string        `env:"CONFIG"`
 }
 
 type AgentConfig struct {
@@ -27,6 +32,19 @@ type AgentConfig struct {
 	PollInterval   time.Duration
 	Key            string
 	CryptoKey      string
+}
+
+type AgentConfigFile struct {
+	Address        string `json:"address"`
+	ReportInterval string `json:"report_interval"`
+	PollInterval   string `json:"poll_interval"`
+	CryptoKey      string `json:"crypto_key"`
+}
+
+type AgentConfigDefault struct {
+	Address        string
+	ReportInterval time.Duration
+	PollInterval   time.Duration
 }
 
 type ServerConfigENV struct {
@@ -50,12 +68,101 @@ type ServerConfig struct {
 	CryptoKey          string
 }
 
+type ServerConfigFile struct {
+	Address       string `json:"address"`
+	Restore       string `json:"restore"`
+	StoreInterval string `json:"store_interval"`
+	StoreFile     string `json:"store_file"`
+	DatabaseDsn   string `json:"database_dsn"`
+	CryptoKey     string `json:"crypto_key"`
+}
+
+type ServerConfigDefault struct {
+	Address        string
+	RestorePtr     bool
+	ReportInterval time.Duration
+	PollInterval   time.Duration
+}
+
+func ThisOSWindows() bool {
+
+	var stderr bytes.Buffer
+	defer stderr.Reset()
+
+	var out bytes.Buffer
+	defer out.Reset()
+
+	cmd := exec.Command("cmd", "ver")
+	cmd.Stdin = strings.NewReader("some input")
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		return false
+	}
+	myOS := out.String()
+	if strings.Contains(myOS, "Microsoft Windows") {
+		return true
+	}
+	return false
+}
+
+func ParsCfgByte(res []byte) bytes.Buffer {
+
+	var out bytes.Buffer
+	configLines := strings.Split(string(res), "\n")
+	for i := 0; i < len(configLines); i++ {
+
+		if configLines[i] != "" {
+			var strs string
+			splitStr := strings.SplitAfterN(configLines[i], "//", -1)
+			if len(splitStr) != 0 {
+				strs = strings.Replace(splitStr[0], "//", "\n", -1)
+				out.WriteString(strs)
+			}
+		}
+	}
+	return out
+}
+
+func GetAgentConfigFile(file *string) AgentConfigFile {
+	var sConfig AgentConfigFile
+
+	res, err := os.ReadFile(*file)
+	if err != nil {
+		return sConfig
+	}
+
+	out := ParsCfgByte(res)
+	defer out.Reset()
+
+	if err = json.Unmarshal([]byte(out.String()), &sConfig); err != nil {
+		return sConfig
+	}
+	if ThisOSWindows() {
+		sConfig.CryptoKey = strings.Replace(sConfig.CryptoKey, "/", "\\", -1)
+	}
+
+	return sConfig
+
+}
+
 func SetConfigAgent() AgentConfig {
-	addressPtr := flag.String("a", constants.AddressServer, "имя сервера")
-	reportIntervalPtr := flag.Duration("r", constants.ReportInterval*time.Second, "интервал отправки на сервер")
-	pollIntervalPtr := flag.Duration("p", constants.PollInterval*time.Second, "интервал сбора метрик")
+
+	agentConfigDefault := AgentConfigDefault{
+		Address:        constants.AddressServer,
+		ReportInterval: constants.ReportInterval * time.Second,
+		PollInterval:   constants.PollInterval * time.Second,
+	}
+
+	addressPtr := flag.String("a", "", "имя сервера")
+	reportIntervalPtr := flag.Duration("r", 0, "интервал отправки на сервер")
+	pollIntervalPtr := flag.Duration("p", 0, "интервал сбора метрик")
 	keyFlag := flag.String("k", "", "ключ хеширования")
 	cryptoKeyFlag := flag.String("crypto-key", "", "файл с криптоключем")
+	fileCfg := flag.String("config", "", "файл с конфигурацией")
+	fileCfgC := flag.String("c", "", "файл с конфигурацией")
+
 	flag.Parse()
 
 	var cfgENV AgentConfigENV
@@ -64,25 +171,49 @@ func SetConfigAgent() AgentConfig {
 		log.Fatal(err)
 	}
 
+	pathFileCfg := ""
+	if *fileCfg != "" {
+		pathFileCfg = *fileCfg
+	} else if *fileCfgC != "" {
+		pathFileCfg = *fileCfgC
+	}
+	if _, ok := os.LookupEnv("CONFIG"); ok {
+		pathFileCfg = cfgENV.Config
+	}
+	var jsonCfg AgentConfigFile
+	jsonCfg = GetAgentConfigFile(&pathFileCfg)
+
 	addressServ := ""
 	if _, ok := os.LookupEnv("ADDRESS"); ok {
 		addressServ = cfgENV.Address
-	} else {
+	} else if *addressPtr != "" {
 		addressServ = *addressPtr
+	} else if jsonCfg.Address != "" {
+		addressServ = jsonCfg.Address
+	} else {
+		addressServ = agentConfigDefault.Address
 	}
 
 	var reportIntervalMetric time.Duration
 	if _, ok := os.LookupEnv("REPORT_INTERVAL"); ok {
 		reportIntervalMetric = cfgENV.ReportInterval
-	} else {
+	} else if *reportIntervalPtr != 0 {
 		reportIntervalMetric = *reportIntervalPtr
+	} else if rmi, _ := time.ParseDuration(jsonCfg.ReportInterval); rmi != 0 {
+		reportIntervalMetric = rmi
+	} else {
+		reportIntervalMetric = agentConfigDefault.ReportInterval
 	}
 
 	var pollIntervalMetrics time.Duration
 	if _, ok := os.LookupEnv("POLL_INTERVAL"); ok {
 		pollIntervalMetrics = cfgENV.PollInterval
-	} else {
+	} else if *pollIntervalPtr != 0 {
 		pollIntervalMetrics = *pollIntervalPtr
+	} else if pi, _ := time.ParseDuration(jsonCfg.PollInterval); pi != 0 {
+		pollIntervalMetrics = pi
+	} else {
+		pollIntervalMetrics = agentConfigDefault.PollInterval
 	}
 
 	keyHash := ""
@@ -95,8 +226,10 @@ func SetConfigAgent() AgentConfig {
 	patchCryptoKey := ""
 	if _, ok := os.LookupEnv("CRYPTO_KEY"); ok {
 		patchCryptoKey = cfgENV.CryptoKey
-	} else {
+	} else if *cryptoKeyFlag != "" {
 		patchCryptoKey = *cryptoKeyFlag
+	} else {
+		patchCryptoKey = jsonCfg.CryptoKey
 	}
 
 	return AgentConfig{
@@ -108,12 +241,42 @@ func SetConfigAgent() AgentConfig {
 	}
 }
 
+func GetServerConfigFile(file *string) ServerConfigFile {
+	var sConfig ServerConfigFile
+
+	res, err := os.ReadFile(*file)
+	if err != nil {
+		return sConfig
+	}
+
+	out := ParsCfgByte(res)
+	defer out.Reset()
+
+	if err = json.Unmarshal([]byte(out.String()), &sConfig); err != nil {
+		return sConfig
+	}
+	if ThisOSWindows() {
+		sConfig.CryptoKey = strings.Replace(sConfig.CryptoKey, "/", "\\", -1)
+		sConfig.StoreFile = strings.Replace(sConfig.StoreFile, "/", "\\", -1)
+	}
+
+	return sConfig
+
+}
+
 func SetConfigServer() ServerConfig {
 
-	addressPtr := flag.String("a", constants.AddressServer, "имя сервера")
-	restorePtr := flag.Bool("r", constants.Restore, "восстанавливать значения при старте")
+	//serverConfigDefault := ServerConfigDefault{
+	//	Address:        constants.AddressServer,
+	//	PollInterval:   ,
+	//	ReportInterval: constants.StoreInterval,
+	//	RestorePtr:     constants.Restore,
+	//}
+
+	addressPtr := flag.String("a", "", "имя сервера")
+	restorePtr := flag.Bool("r", false, "восстанавливать значения при старте")
 	storeIntervalPtr := flag.Duration("i", constants.StoreInterval, "интервал автосохранения (сек.)")
-	storeFilePtr := flag.String("f", constants.StoreFile, "путь к файлу метрик")
+	storeFilePtr := flag.String("f", "", "путь к файлу метрик")
 	keyFlag := flag.String("k", "", "ключ хеша")
 	keyDatabaseDsn := flag.String("d", "", "строка соединения с базой")
 	cryptoKeyFlag := flag.String("crypto-key", "", "файл с криптоключем")
