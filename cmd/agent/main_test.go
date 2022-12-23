@@ -173,9 +173,13 @@ func TestFuncAgen(t *testing.T) {
 
 func BenchmarkSendMetrics(b *testing.B) {
 	a := agent{}
-	ac := &environment.AgentConfig{}
-	a.cfg = ac
-	a.cfg.Address = "localhost:8080"
+	a.cfg = environment.InitConfigAgent()
+	if a.cfg.Address == "" {
+		return
+	}
+
+	certPublicKey, _ := encryption.InitPublicKey(a.cfg.CryptoKey)
+	a.KeyEncryption = certPublicKey
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < 10000; i++ {

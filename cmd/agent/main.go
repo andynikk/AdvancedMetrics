@@ -58,7 +58,7 @@ func (eam *emtyArrMetrics) prepareMetrics(key *encryption.KeyEncryption) ([]byte
 		return nil, err
 	}
 
-	if key.PublicKey != nil {
+	if key != nil && key.PublicKey != nil {
 		gziparrMetrics, err = key.RsaEncrypt(gziparrMetrics)
 		if err != nil {
 			return nil, err
