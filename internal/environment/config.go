@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"flag"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/andynikk/advancedmetrics/internal/networks"
 	"github.com/caarlos0/env/v6"
 	"github.com/rs/zerolog"
 
@@ -24,7 +26,6 @@ type AgentConfigENV struct {
 	Key            string        `env:"KEY"`
 	CryptoKey      string        `env:"CRYPTO_KEY"`
 	Config         string        `env:"CONFIG"`
-	TrustedSubnet  string        `env:"TRUSTED_SUBNET"`
 }
 
 type AgentConfig struct {
@@ -34,7 +35,7 @@ type AgentConfig struct {
 	Key            string
 	CryptoKey      string
 	ConfigFilePath string
-	TrustedSubnet  string
+	IPAddress      string
 }
 
 type AgentConfigFile struct {
@@ -42,7 +43,6 @@ type AgentConfigFile struct {
 	ReportInterval string `json:"report_interval"`
 	PollInterval   string `json:"poll_interval"`
 	CryptoKey      string `json:"crypto_key"`
-	TrustedSubnet  string `json:"trusted_subnet"`
 }
 
 type ServerConfigENV struct {
@@ -54,6 +54,7 @@ type ServerConfigENV struct {
 	DatabaseDsn   string        `env:"DATABASE_DSN"`
 	CryptoKey     string        `env:"CRYPTO_KEY"`
 	Config        string        `env:"CONFIG"`
+	TrustedSubnet string        `env:"TRUSTED_SUBNET"`
 }
 
 type ServerConfig struct {
@@ -66,6 +67,7 @@ type ServerConfig struct {
 	TypeMetricsStorage repository.MapTypeStore
 	CryptoKey          string
 	ConfigFilePath     string
+	TrustedSubnet      *net.IPNet
 }
 
 type ServerConfigFile struct {
@@ -75,6 +77,7 @@ type ServerConfigFile struct {
 	StoreFile     string `json:"store_file"`
 	DatabaseDsn   string `json:"database_dsn"`
 	CryptoKey     string `json:"crypto_key"`
+	TrustedSubnet string `json:"trusted_subnet"`
 }
 
 func ThisOSWindows() bool {
@@ -188,18 +191,12 @@ func (ac *AgentConfig) InitConfigAgentENV() {
 		patchCryptoKey = cfgENV.CryptoKey
 	}
 
-	trustedSubnet := ""
-	if _, ok := os.LookupEnv("TRUSTED_SUBNET"); ok {
-		trustedSubnet = cfgENV.TrustedSubnet
-	}
-
 	ac.Address = addressServ
 	ac.ReportInterval = reportIntervalMetric
 	ac.PollInterval = pollIntervalMetrics
 	ac.Key = keyHash
 	ac.CryptoKey = patchCryptoKey
 	ac.ConfigFilePath = pathFileCfg
-	ac.TrustedSubnet = trustedSubnet
 }
 
 func (ac *AgentConfig) InitConfigAgentFlag() {
@@ -211,7 +208,6 @@ func (ac *AgentConfig) InitConfigAgentFlag() {
 	cryptoKeyFlag := flag.String("crypto-key", "", "файл с криптоключем")
 	fileCfg := flag.String("config", "", "файл с конфигурацией")
 	fileCfgC := flag.String("c", "", "файл с конфигурацией")
-	trustedSubnet := flag.String("t", "", "строковое представление бесклассовой адресации (CIDR)")
 
 	flag.Parse()
 
@@ -240,9 +236,6 @@ func (ac *AgentConfig) InitConfigAgentFlag() {
 	if ac.ConfigFilePath == "" {
 		ac.ConfigFilePath = pathFileCfg
 	}
-	if ac.TrustedSubnet == "" {
-		ac.TrustedSubnet = *trustedSubnet
-	}
 }
 
 func (ac *AgentConfig) InitConfigAgentFile() {
@@ -258,7 +251,6 @@ func (ac *AgentConfig) InitConfigAgentFile() {
 	reportIntervalMetric, _ := time.ParseDuration(jsonCfg.ReportInterval)
 	pollIntervalMetrics, _ := time.ParseDuration(jsonCfg.PollInterval)
 	patchCryptoKey := jsonCfg.CryptoKey
-	trustedSubnet := jsonCfg.TrustedSubnet
 
 	if ac.Address == "" {
 		ac.Address = addressServ
@@ -275,10 +267,6 @@ func (ac *AgentConfig) InitConfigAgentFile() {
 	if ac.CryptoKey == "" {
 		ac.CryptoKey = patchCryptoKey
 	}
-	if ac.TrustedSubnet == "" {
-		ac.TrustedSubnet = trustedSubnet
-	}
-
 }
 
 func (ac *AgentConfig) InitConfigAgentDefault() {
@@ -296,6 +284,10 @@ func (ac *AgentConfig) InitConfigAgentDefault() {
 	if ac.PollInterval == 0 {
 		ac.PollInterval = pollIntervalMetrics
 	}
+
+	hn, _ := os.Hostname()
+	IPs, _ := net.LookupIP(hn)
+	ac.IPAddress = networks.IPStr(IPs)
 }
 
 func GetServerConfigFile(file *string) ServerConfigFile {
@@ -381,6 +373,11 @@ func (sc *ServerConfig) InitConfigServerENV() {
 		patchFileConfig = cfgENV.Config
 	}
 
+	var trustedSubnet string
+	if _, ok := os.LookupEnv("TRUSTED_SUBNET"); ok {
+		trustedSubnet = cfgENV.TrustedSubnet
+	}
+
 	MapTypeStore := make(repository.MapTypeStore)
 	if databaseDsn != "" {
 		typeDB := repository.TypeStoreDataDB{}
@@ -399,6 +396,9 @@ func (sc *ServerConfig) InitConfigServerENV() {
 	sc.TypeMetricsStorage = MapTypeStore
 	sc.CryptoKey = patchCryptoKey
 	sc.ConfigFilePath = patchFileConfig
+
+	_, ipv4Net, _ := net.ParseCIDR(trustedSubnet)
+	sc.TrustedSubnet = ipv4Net
 }
 
 func (sc *ServerConfig) InitConfigServerFlag() {
@@ -412,6 +412,7 @@ func (sc *ServerConfig) InitConfigServerFlag() {
 	cryptoKeyFlag := flag.String("crypto-key", "", "файл с криптоключем")
 	fileCfg := flag.String("config", "", "файл с конфигурацией")
 	fileCfgC := flag.String("c", "", "файл с конфигурацией")
+	trustedSubnet := flag.String("t", "", "строковое представление бесклассовой адресации (CIDR)")
 
 	flag.Parse()
 
@@ -460,6 +461,10 @@ func (sc *ServerConfig) InitConfigServerFlag() {
 	if len(sc.TypeMetricsStorage) == 0 {
 		sc.TypeMetricsStorage = MapTypeStore
 	}
+	if sc.TrustedSubnet.String() == "" {
+		_, ipv4Net, _ := net.ParseCIDR(*trustedSubnet)
+		sc.TrustedSubnet = ipv4Net
+	}
 }
 
 func (sc *ServerConfig) InitConfigServerFile() {
@@ -477,6 +482,7 @@ func (sc *ServerConfig) InitConfigServerFile() {
 	storeFileMetrics := jsonCfg.StoreFile
 	databaseDsn := jsonCfg.DatabaseDsn
 	patchCryptoKey := jsonCfg.CryptoKey
+	trustedSubnet := jsonCfg.TrustedSubnet
 
 	MapTypeStore := make(repository.MapTypeStore)
 	if len(sc.TypeMetricsStorage) == 0 {
@@ -510,6 +516,10 @@ func (sc *ServerConfig) InitConfigServerFile() {
 	if len(sc.TypeMetricsStorage) == 0 {
 		sc.TypeMetricsStorage = MapTypeStore
 	}
+	if sc.TrustedSubnet.String() == "" {
+		_, ipv4Net, _ := net.ParseCIDR(trustedSubnet)
+		sc.TrustedSubnet = ipv4Net
+	}
 }
 
 func (sc *ServerConfig) InitConfigServerDefault() {
@@ -526,5 +536,4 @@ func (sc *ServerConfig) InitConfigServerDefault() {
 	if !sc.Restore {
 		sc.Restore = constants.Restore
 	}
-
 }

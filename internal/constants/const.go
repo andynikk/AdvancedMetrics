@@ -71,6 +71,8 @@ const (
 					
 					ALTER TABLE IF EXISTS metrics.store
 						OWNER to postgres;`
+
+	SepIPAddress = ";"
 )
 
 func (tmc TypeMetricsStorage) String() string {

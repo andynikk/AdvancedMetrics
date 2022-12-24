@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andynikk/advancedmetrics/internal/middlware"
 	"github.com/gorilla/mux"
 
 	"github.com/andynikk/advancedmetrics/internal/compression"
@@ -76,12 +77,12 @@ func InitRoutersMux(rs *RepStore) {
 
 	r.HandleFunc("/", rs.HandlerGetAllMetrics).Methods("GET")
 	r.HandleFunc("/value/{metType}/{metName}", rs.HandlerGetValue).Methods("GET")
-	r.HandleFunc("/ping", rs.HandlerPingDB).Methods("GET")
-
-	r.HandleFunc("/update/{metType}/{metName}/{metValue}", rs.HandlerSetMetricaPOST).Methods("POST")
-	r.HandleFunc("/update", rs.HandlerUpdateMetricJSON).Methods("POST")
-	r.HandleFunc("/updates", rs.HandlerUpdatesMetricJSON).Methods("POST")
 	r.HandleFunc("/value", rs.HandlerValueMetricaJSON).Methods("POST")
+
+	r.Handle("/ping", middlware.CheckIP(rs.HandlerPingDB)).Methods("GET")
+	r.Handle("/update/{metType}/{metName}/{metValue}", middlware.CheckIP(rs.HandlerSetMetricaPOST)).Methods("POST")
+	r.Handle("/update", middlware.CheckIP(rs.HandlerUpdateMetricJSON)).Methods("POST")
+	r.Handle("/updates", middlware.CheckIP(rs.HandlerUpdatesMetricJSON)).Methods("POST")
 
 	r.HandleFunc("/debug/pprof", pprof.Index)
 	r.HandleFunc("/debug/pprof/", pprof.Index)

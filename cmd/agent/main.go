@@ -176,7 +176,8 @@ func (a *agent) Post2Server(allMterics []byte) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
-	if a.KeyEncryption.PublicKey != nil {
+	req.Header.Set("X-Real-IP", a.cfg.IPAddress)
+	if a.KeyEncryption != nil && a.KeyEncryption.PublicKey != nil {
 		req.Header.Set("Content-Encryption", a.KeyEncryption.TypeEncryption)
 	}
 
