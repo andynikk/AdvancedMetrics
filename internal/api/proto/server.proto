@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package api;
+
+option go_package = "./";
+
+service Updaters {
+  rpc Update(UpdateRequest) returns (UpdateRespons) {}
+}
+
+message UpdateRequest {
+  bytes header = 1;
+  bytes body = 2;
+}
+
+message UpdateRespons {
+  bool result = 1;
+}

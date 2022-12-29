@@ -1,17 +1,13 @@
 package environment
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
-	"log"
 	"net"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/andynikk/advancedmetrics/internal/networks"
 	"github.com/caarlos0/env/v6"
 	"github.com/rs/zerolog"
 
@@ -19,33 +15,7 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 
-type AgentConfigENV struct {
-	Address        string        `env:"ADDRESS" envDefault:"localhost:8080"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
-	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2s"`
-	Key            string        `env:"KEY"`
-	CryptoKey      string        `env:"CRYPTO_KEY"`
-	Config         string        `env:"CONFIG"`
-}
-
-type AgentConfig struct {
-	Address        string
-	ReportInterval time.Duration
-	PollInterval   time.Duration
-	Key            string
-	CryptoKey      string
-	ConfigFilePath string
-	IPAddress      string
-}
-
-type AgentConfigFile struct {
-	Address        string `json:"address"`
-	ReportInterval string `json:"report_interval"`
-	PollInterval   string `json:"poll_interval"`
-	CryptoKey      string `json:"crypto_key"`
-}
-
-type ServerConfigENV struct {
+type GRPCConfigENV struct {
 	Address       string        `env:"ADDRESS" envDefault:"localhost:8080"`
 	StoreInterval time.Duration `env:"STORE_INTERVAL" envDefault:"300s"`
 	StoreFile     string        `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json"`
@@ -57,7 +27,7 @@ type ServerConfigENV struct {
 	TrustedSubnet string        `env:"TRUSTED_SUBNET"`
 }
 
-type ServerConfig struct {
+type GRPCConfig struct {
 	StoreInterval      time.Duration
 	StoreFile          string
 	Restore            bool
@@ -70,7 +40,7 @@ type ServerConfig struct {
 	TrustedSubnet      *net.IPNet
 }
 
-type ServerConfigFile struct {
+type GRPCConfigFile struct {
 	Address       string `json:"address"`
 	Restore       bool   `json:"restore"`
 	StoreInterval string `json:"store_interval"`
@@ -80,218 +50,8 @@ type ServerConfigFile struct {
 	TrustedSubnet string `json:"trusted_subnet"`
 }
 
-func ThisOSWindows() bool {
-
-	var stderr bytes.Buffer
-	defer stderr.Reset()
-
-	var out bytes.Buffer
-	defer out.Reset()
-
-	cmd := exec.Command("cmd", "ver")
-	cmd.Stdin = strings.NewReader("some input")
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	if err != nil {
-		return false
-	}
-	myOS := out.String()
-	if strings.Contains(myOS, "Microsoft Windows") {
-		return true
-	}
-	return false
-}
-
-func ParsCfgByte(res []byte) bytes.Buffer {
-
-	var out bytes.Buffer
-	configLines := strings.Split(string(res), "\n")
-	for i := 0; i < len(configLines); i++ {
-
-		if configLines[i] != "" {
-			var strs string
-			splitStr := strings.SplitAfterN(configLines[i], "// ", -1)
-			if len(splitStr) != 0 {
-				strs = strings.Replace(splitStr[0], "// ", "\n", -1)
-				out.WriteString(strs)
-			}
-		}
-	}
-	return out
-}
-
-func GetAgentConfigFile(file *string) AgentConfigFile {
-	var sConfig AgentConfigFile
-
-	res, err := os.ReadFile(*file)
-	if err != nil {
-		return sConfig
-	}
-
-	out := ParsCfgByte(res)
-	defer out.Reset()
-
-	if err = json.Unmarshal([]byte(out.String()), &sConfig); err != nil {
-		return sConfig
-	}
-	if ThisOSWindows() {
-		sConfig.CryptoKey = strings.Replace(sConfig.CryptoKey, "/", "\\", -1)
-	}
-
-	return sConfig
-
-}
-
-func InitConfigAgent() *AgentConfig {
-	configAgent := AgentConfig{}
-	configAgent.InitConfigAgentENV()
-	configAgent.InitConfigAgentFlag()
-	configAgent.InitConfigAgentFile()
-	configAgent.InitConfigAgentDefault()
-
-	return &configAgent
-}
-
-func (ac *AgentConfig) InitConfigAgentENV() {
-
-	var cfgENV AgentConfigENV
-	err := env.Parse(&cfgENV)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	pathFileCfg := ""
-	if _, ok := os.LookupEnv("CONFIG"); ok {
-		pathFileCfg = cfgENV.Config
-	}
-
-	addressServ := ""
-	if _, ok := os.LookupEnv("ADDRESS"); ok {
-		addressServ = cfgENV.Address
-	}
-
-	var reportIntervalMetric time.Duration
-	if _, ok := os.LookupEnv("REPORT_INTERVAL"); ok {
-		reportIntervalMetric = cfgENV.ReportInterval
-	}
-
-	var pollIntervalMetrics time.Duration
-	if _, ok := os.LookupEnv("POLL_INTERVAL"); ok {
-		pollIntervalMetrics = cfgENV.PollInterval
-	}
-
-	keyHash := ""
-	if _, ok := os.LookupEnv("KEY"); ok {
-		keyHash = cfgENV.Key
-	}
-
-	patchCryptoKey := ""
-	if _, ok := os.LookupEnv("CRYPTO_KEY"); ok {
-		patchCryptoKey = cfgENV.CryptoKey
-	}
-
-	ac.Address = addressServ
-	ac.ReportInterval = reportIntervalMetric
-	ac.PollInterval = pollIntervalMetrics
-	ac.Key = keyHash
-	ac.CryptoKey = patchCryptoKey
-	ac.ConfigFilePath = pathFileCfg
-}
-
-func (ac *AgentConfig) InitConfigAgentFlag() {
-
-	addressPtr := flag.String("a", "", "имя сервера")
-	reportIntervalPtr := flag.Duration("r", 0, "интервал отправки на сервер")
-	pollIntervalPtr := flag.Duration("p", 0, "интервал сбора метрик")
-	keyFlag := flag.String("k", "", "ключ хеширования")
-	cryptoKeyFlag := flag.String("crypto-key", "", "файл с криптоключем")
-	fileCfg := flag.String("config", "", "файл с конфигурацией")
-	fileCfgC := flag.String("c", "", "файл с конфигурацией")
-
-	flag.Parse()
-
-	pathFileCfg := ""
-	if *fileCfg != "" {
-		pathFileCfg = *fileCfg
-	} else if *fileCfgC != "" {
-		pathFileCfg = *fileCfgC
-	}
-
-	if ac.Address == "" {
-		ac.Address = *addressPtr
-	}
-	if ac.ReportInterval == 0 {
-		ac.ReportInterval = *reportIntervalPtr
-	}
-	if ac.PollInterval == 0 {
-		ac.PollInterval = *pollIntervalPtr
-	}
-	if ac.Key == "" {
-		ac.Key = *keyFlag
-	}
-	if ac.CryptoKey == "" {
-		ac.CryptoKey = *cryptoKeyFlag
-	}
-	if ac.ConfigFilePath == "" {
-		ac.ConfigFilePath = pathFileCfg
-	}
-}
-
-func (ac *AgentConfig) InitConfigAgentFile() {
-
-	if ac.ConfigFilePath == "" {
-		return
-	}
-
-	var jsonCfg AgentConfigFile
-	jsonCfg = GetAgentConfigFile(&ac.ConfigFilePath)
-
-	addressServ := jsonCfg.Address
-	reportIntervalMetric, _ := time.ParseDuration(jsonCfg.ReportInterval)
-	pollIntervalMetrics, _ := time.ParseDuration(jsonCfg.PollInterval)
-	patchCryptoKey := jsonCfg.CryptoKey
-
-	if ac.Address == "" {
-		ac.Address = addressServ
-	}
-	if ac.ReportInterval == 0 {
-		ac.ReportInterval = reportIntervalMetric
-	}
-	if ac.PollInterval == 0 {
-		ac.PollInterval = pollIntervalMetrics
-	}
-	if ac.CryptoKey == "" {
-		ac.CryptoKey = patchCryptoKey
-	}
-	if ac.CryptoKey == "" {
-		ac.CryptoKey = patchCryptoKey
-	}
-}
-
-func (ac *AgentConfig) InitConfigAgentDefault() {
-
-	addressServ := constants.AddressServer
-	reportIntervalMetric := constants.ReportInterval * time.Second
-	pollIntervalMetrics := constants.PollInterval * time.Second
-
-	if ac.Address == "" {
-		ac.Address = addressServ
-	}
-	if ac.ReportInterval == 0 {
-		ac.ReportInterval = reportIntervalMetric
-	}
-	if ac.PollInterval == 0 {
-		ac.PollInterval = pollIntervalMetrics
-	}
-
-	hn, _ := os.Hostname()
-	IPs, _ := net.LookupIP(hn)
-	ac.IPAddress = networks.IPStr(IPs)
-}
-
-func GetServerConfigFile(file *string) ServerConfigFile {
-	var sConfig ServerConfigFile
+func GetGRPCConfigFile(file *string) GRPCConfigFile {
+	var sConfig GRPCConfigFile
 
 	res, err := os.ReadFile(*file)
 	if err != nil {
@@ -313,21 +73,21 @@ func GetServerConfigFile(file *string) ServerConfigFile {
 
 }
 
-func InitConfigServer() *ServerConfig {
+func InitConfigGRPC() *GRPCConfig {
 	constants.Logger.Log = zerolog.New(os.Stdout).Level(zerolog.InfoLevel)
 
-	sc := ServerConfig{}
-	sc.InitConfigServerENV()
-	sc.InitConfigServerFlag()
-	sc.InitConfigServerFile()
-	sc.InitConfigServerDefault()
+	sc := GRPCConfig{}
+	sc.InitConfigGRPCENV()
+	sc.InitConfigGRPCFlag()
+	sc.InitConfigGRPCFile()
+	sc.InitConfigGRPCDefault()
 
 	return &sc
 }
 
-func (sc *ServerConfig) InitConfigServerENV() {
+func (sc *GRPCConfig) InitConfigGRPCENV() {
 
-	var cfgENV ServerConfigENV
+	var cfgENV GRPCConfigENV
 	err := env.Parse(&cfgENV)
 	if err != nil {
 		return
@@ -401,7 +161,7 @@ func (sc *ServerConfig) InitConfigServerENV() {
 	sc.TrustedSubnet = ipv4Net
 }
 
-func (sc *ServerConfig) InitConfigServerFlag() {
+func (sc *GRPCConfig) InitConfigGRPCFlag() {
 
 	addressPtr := flag.String("a", "", "имя сервера")
 	restorePtr := flag.Bool("r", false, "восстанавливать значения при старте")
@@ -467,14 +227,14 @@ func (sc *ServerConfig) InitConfigServerFlag() {
 	}
 }
 
-func (sc *ServerConfig) InitConfigServerFile() {
+func (sc *GRPCConfig) InitConfigGRPCFile() {
 
 	if sc.ConfigFilePath == "" {
 		return
 	}
 
-	var jsonCfg ServerConfigFile
-	jsonCfg = GetServerConfigFile(&sc.ConfigFilePath)
+	var jsonCfg GRPCConfigFile
+	jsonCfg = GetGRPCConfigFile(&sc.ConfigFilePath)
 
 	addressServ := jsonCfg.Address
 	restoreMetric := jsonCfg.Restore
@@ -522,7 +282,7 @@ func (sc *ServerConfig) InitConfigServerFile() {
 	}
 }
 
-func (sc *ServerConfig) InitConfigServerDefault() {
+func (sc *GRPCConfig) InitConfigGRPCDefault() {
 
 	if sc.Address == "" {
 		sc.Address = constants.AddressServer

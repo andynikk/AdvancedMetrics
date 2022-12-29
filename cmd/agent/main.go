@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -15,8 +16,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andynikk/advancedmetrics/internal/constants/errs"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/andynikk/advancedmetrics/internal/compression"
 	"github.com/andynikk/advancedmetrics/internal/constants"
@@ -24,6 +28,7 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
+	"github.com/andynikk/advancedmetrics/internal/grpchandlers/api"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
 
@@ -194,16 +199,80 @@ func (a *agent) Post2Server(allMterics []byte) error {
 	return nil
 }
 
-func (a *agent) goPost2Server(matricsButch *MapMetricsButch) error {
+func (a *agent) Post2gRPSServer(allMterics []byte) error {
 
-	for _, allMetrics := range *matricsButch {
+	conn, err := grpc.Dial(constants.AddressServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var hdr string
+	hdr += "Content-Type:application/json\n"
+	hdr += "Content-Encoding:gzip\n"
+	hdr += fmt.Sprintf("X-Real-IP:%s\n", a.cfg.IPAddress)
+	if a.KeyEncryption != nil && a.KeyEncryption.PublicKey != nil {
+		hdr += fmt.Sprintf("Content-Encryption:%s\n", a.KeyEncryption.TypeEncryption)
+	}
+
+	c := api.NewUpdatersClient(conn)
+
+	res, err := c.Update(context.Background(), &api.UpdateRequest{Header: []byte(hdr), Body: allMterics})
+	if err != nil {
+		log.Fatal(err)
+	}
+	ok := res.GetResult()
+	if !ok {
+		return errs.ErrSendMsgGPRC
+	}
+
+	return nil
+
+	//addressPost := fmt.Sprintf("http://%s/updates", a.cfg.Address)
+	//
+	//req, err := http.NewRequest("POST", addressPost, bytes.NewReader(allMterics))
+	//if err != nil {
+	//
+	//	constants.Logger.ErrorLog(err)
+	//
+	//	return errors.New("-- ошибка отправки данных на сервер (1)")
+	//}
+	//req.Header.Set("Content-Type", "application/json")
+	//req.Header.Set("Content-Encoding", "gzip")
+	//req.Header.Set("X-Real-IP", a.cfg.IPAddress)
+	//if a.KeyEncryption != nil && a.KeyEncryption.PublicKey != nil {
+	//	req.Header.Set("Content-Encryption", a.KeyEncryption.TypeEncryption)
+	//}
+	//
+	//defer req.Body.Close()
+	//
+	//client := &http.Client{}
+	//resp, err := client.Do(req)
+	//if err != nil {
+	//	constants.Logger.ErrorLog(err)
+	//	return errors.New("-- ошибка отправки данных на сервер (2)")
+	//}
+	//defer resp.Body.Close()
+	//
+	//return nil
+}
+
+func (a *agent) goPost2Server(matricsButch MapMetricsButch) error {
+
+	for _, allMetrics := range matricsButch {
 
 		gziparrMetrics, err := allMetrics.prepareMetrics(a.KeyEncryption)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return err
 		}
-		if err = a.Post2Server(gziparrMetrics); err != nil {
+
+		//if err = a.Post2Server(gziparrMetrics); err != nil {
+		//	constants.Logger.ErrorLog(err)
+		//	return err
+		//}
+
+		err = a.Post2gRPSServer(gziparrMetrics)
+		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return err
 		}
@@ -264,7 +333,7 @@ func (a *agent) goMakeRequest(ctx context.Context, cancelFunc context.CancelFunc
 		select {
 		case <-reportTicker.C:
 			mapAllMetrics, _ := a.SendMetricsServer()
-			go a.goPost2Server(&mapAllMetrics)
+			go a.goPost2Server(mapAllMetrics)
 
 		case <-ctx.Done():
 
@@ -293,6 +362,13 @@ func main() {
 		KeyEncryption: certPublicKey,
 	}
 
+	//err := a.Post2gRPSServer([]byte{})
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//return
+
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	go a.goMetrixScan(ctx, cancelFunc)
@@ -305,5 +381,5 @@ func main() {
 
 	//a.metricsGauge["BuckHashSys"] = repository.Gauge(0.0001)
 	mapMetricsButch, _ := a.SendMetricsServer()
-	_ = a.goPost2Server(&mapMetricsButch)
+	_ = a.goPost2Server(mapMetricsButch)
 }

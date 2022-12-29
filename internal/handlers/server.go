@@ -14,9 +14,9 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/andynikk/advancedmetrics/internal/constants/errs"
 	"github.com/andynikk/advancedmetrics/internal/middlware"
 	"github.com/gorilla/mux"
 
@@ -43,8 +43,7 @@ type RepStore struct {
 	Config *environment.ServerConfig
 	PK     *encryption.KeyEncryption
 	Router *mux.Router
-	sync.Mutex
-	repository.MapMetrics
+	*repository.SyncMapMetrics
 }
 
 func (mt MetricType) String() string {
@@ -310,8 +309,6 @@ func (rs *RepStore) HandlerUpdateMetricJSON(rw http.ResponseWriter, rq *http.Req
 // Может принимать JSON в жатом виде gzip. Сохраняет значение в физическое и временное хранилище.
 func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Request) {
 
-	var bodyJSON io.Reader
-
 	contentEncoding := rq.Header.Get("Content-Encoding")
 	contentEncryption := rq.Header.Get("Content-Encryption")
 
@@ -339,32 +336,36 @@ func (rs *RepStore) HandlerUpdatesMetricJSON(rw http.ResponseWriter, rq *http.Re
 			return
 		}
 	}
+	if err = rs.Updates(bytBody); err != nil {
+		if err == errs.ErrStatusInternalServer {
+			http.Error(rw, "Ошибка распаковки", http.StatusInternalServerError)
+		}
+	}
+}
 
-	bodyJSON = bytes.NewReader(bytBody)
+func (rs *RepStore) Updates(msg []byte) error {
+
+	bodyJSON := bytes.NewReader(msg)
 	respByte, err := io.ReadAll(bodyJSON)
 
 	if err != nil {
 		constants.Logger.ErrorLog(err)
-		http.Error(rw, "Ошибка распаковки", http.StatusInternalServerError)
+		return errs.ErrStatusInternalServer
 	}
 
 	var storedData encoding.ArrMetrics
 	if err := json.Unmarshal(respByte, &storedData); err != nil {
 		constants.Logger.ErrorLog(err)
-		http.Error(rw, "Ошибка распаковки", http.StatusInternalServerError)
+		return errs.ErrStatusInternalServer
 	}
-
-	//for _, val := range storedData {
-	//	if val.ID == "BuckHashSys" {
-	//		fmt.Println(fmt.Sprintf("BuckHashSys: %f", *val.Value))
-	//	}
-	//}
 
 	rs.SetValueInMapJSON(storedData)
 
 	for _, val := range rs.Config.TypeMetricsStorage {
 		val.WriteMetric(storedData)
 	}
+
+	return nil
 }
 
 // HandlerValueMetricaJSON Handler, который работает с POST запросом формата "/value".

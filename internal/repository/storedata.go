@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"sync"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 
@@ -27,6 +28,11 @@ type TypeStoreDataDB struct {
 // StoreFile путь к файлу хранения метрик
 type TypeStoreDataFile struct {
 	StoreFile string
+}
+
+type SyncMapMetrics struct {
+	sync.Mutex
+	MapMetrics
 }
 
 type MapTypeStore = map[string]TypeStoreData
