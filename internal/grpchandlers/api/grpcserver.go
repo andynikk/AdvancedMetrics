@@ -47,16 +47,9 @@ func (s *GRPCServer) UpdatesJSON(ctx context.Context, req *UpdatesRequest) (*Boo
 		return &BoolRespons{Result: false}, nil
 	}
 	return &BoolRespons{Result: true}, nil
-
-	//sRMQ := new(rabbitmq.SettingRMQ)
-	//sRMQ.ConnRMQ()
-	//sRMQ.ChannelRMQ()
-	//sRMQ.QueueRMQ()
-	//sRMQ.MessageRMQ(mHeader, req.Body)
 }
 
 func (s *GRPCServer) UpdateJSON(ctx context.Context, req *UpdateStrRequest) (*BoolRespons, error) {
-
 	header := Header(ctx)
 
 	err := s.RepStore.HandlerUpdateMetricJSON(header, req.Body)
@@ -67,16 +60,11 @@ func (s *GRPCServer) UpdateJSON(ctx context.Context, req *UpdateStrRequest) (*Bo
 }
 
 func (s *GRPCServer) Update(ctx context.Context, req *UpdateRequest) (*BoolRespons, error) {
-
-	//md, _ := metadata.FromIncomingContext(ctx)
-	//header := Header(md)
-
 	err := s.RepStore.HandlerSetMetricaPOST(string(req.MetType), string(req.MetName), string(req.MetValue))
 	if err != nil {
 		return &BoolRespons{Result: false}, err
 	}
 	return &BoolRespons{Result: true}, nil
-
 }
 
 func (s *GRPCServer) Ping(ctx context.Context, req *EmtyRequest) (*BoolRespons, error) {
@@ -90,7 +78,6 @@ func (s *GRPCServer) Ping(ctx context.Context, req *EmtyRequest) (*BoolRespons, 
 }
 
 func (s *GRPCServer) ValueJSON(ctx context.Context, req *UpdatesRequest) (*FullRespons, error) {
-
 	header := Header(ctx)
 
 	h, body, err := s.RepStore.HandlerValueMetricaJSON(header, req.Body)
@@ -108,20 +95,12 @@ func (s *GRPCServer) ValueJSON(ctx context.Context, req *UpdatesRequest) (*FullR
 }
 
 func (s *GRPCServer) Value(ctx context.Context, req *UpdatesRequest) (*StatusRespons, error) {
-
-	//md, _ := metadata.FromIncomingContext(ctx)
-	//header := Header(md)
-
 	val, err := s.RepStore.HandlerGetValue(req.Body)
 	return &StatusRespons{Result: []byte(val), Status: errs.StatusError(err)}, err
-
 }
 
 func (s *GRPCServer) ListMetrics(ctx context.Context, req *EmtyRequest) (*StatusRespons, error) {
-
 	header := Header(ctx)
-
 	_, val := s.RepStore.HandlerGetAllMetrics(header)
 	return &StatusRespons{Result: val, Status: 200}, nil
-
 }
