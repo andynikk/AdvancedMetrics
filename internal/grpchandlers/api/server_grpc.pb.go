@@ -22,7 +22,13 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UpdatersClient interface {
-	Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*UpdateRespons, error)
+	UpdatesJSON(ctx context.Context, in *UpdatesRequest, opts ...grpc.CallOption) (*BoolRespons, error)
+	UpdateJSON(ctx context.Context, in *UpdateStrRequest, opts ...grpc.CallOption) (*BoolRespons, error)
+	Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*BoolRespons, error)
+	Ping(ctx context.Context, in *EmtyRequest, opts ...grpc.CallOption) (*BoolRespons, error)
+	ValueJSON(ctx context.Context, in *UpdatesRequest, opts ...grpc.CallOption) (*FullRespons, error)
+	Value(ctx context.Context, in *UpdatesRequest, opts ...grpc.CallOption) (*StatusRespons, error)
+	ListMetrics(ctx context.Context, in *EmtyRequest, opts ...grpc.CallOption) (*StatusRespons, error)
 }
 
 type updatersClient struct {
@@ -33,9 +39,63 @@ func NewUpdatersClient(cc grpc.ClientConnInterface) UpdatersClient {
 	return &updatersClient{cc}
 }
 
-func (c *updatersClient) Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*UpdateRespons, error) {
-	out := new(UpdateRespons)
+func (c *updatersClient) UpdatesJSON(ctx context.Context, in *UpdatesRequest, opts ...grpc.CallOption) (*BoolRespons, error) {
+	out := new(BoolRespons)
+	err := c.cc.Invoke(ctx, "/api.Updaters/UpdatesJSON", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *updatersClient) UpdateJSON(ctx context.Context, in *UpdateStrRequest, opts ...grpc.CallOption) (*BoolRespons, error) {
+	out := new(BoolRespons)
+	err := c.cc.Invoke(ctx, "/api.Updaters/UpdateJSON", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *updatersClient) Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*BoolRespons, error) {
+	out := new(BoolRespons)
 	err := c.cc.Invoke(ctx, "/api.Updaters/Update", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *updatersClient) Ping(ctx context.Context, in *EmtyRequest, opts ...grpc.CallOption) (*BoolRespons, error) {
+	out := new(BoolRespons)
+	err := c.cc.Invoke(ctx, "/api.Updaters/Ping", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *updatersClient) ValueJSON(ctx context.Context, in *UpdatesRequest, opts ...grpc.CallOption) (*FullRespons, error) {
+	out := new(FullRespons)
+	err := c.cc.Invoke(ctx, "/api.Updaters/ValueJSON", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *updatersClient) Value(ctx context.Context, in *UpdatesRequest, opts ...grpc.CallOption) (*StatusRespons, error) {
+	out := new(StatusRespons)
+	err := c.cc.Invoke(ctx, "/api.Updaters/Value", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *updatersClient) ListMetrics(ctx context.Context, in *EmtyRequest, opts ...grpc.CallOption) (*StatusRespons, error) {
+	out := new(StatusRespons)
+	err := c.cc.Invoke(ctx, "/api.Updaters/ListMetrics", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +106,13 @@ func (c *updatersClient) Update(ctx context.Context, in *UpdateRequest, opts ...
 // All implementations must embed UnimplementedUpdatersServer
 // for forward compatibility
 type UpdatersServer interface {
-	Update(context.Context, *UpdateRequest) (*UpdateRespons, error)
+	UpdatesJSON(context.Context, *UpdatesRequest) (*BoolRespons, error)
+	UpdateJSON(context.Context, *UpdateStrRequest) (*BoolRespons, error)
+	Update(context.Context, *UpdateRequest) (*BoolRespons, error)
+	Ping(context.Context, *EmtyRequest) (*BoolRespons, error)
+	ValueJSON(context.Context, *UpdatesRequest) (*FullRespons, error)
+	Value(context.Context, *UpdatesRequest) (*StatusRespons, error)
+	ListMetrics(context.Context, *EmtyRequest) (*StatusRespons, error)
 	mustEmbedUnimplementedUpdatersServer()
 }
 
@@ -54,8 +120,26 @@ type UpdatersServer interface {
 type UnimplementedUpdatersServer struct {
 }
 
-func (UnimplementedUpdatersServer) Update(context.Context, *UpdateRequest) (*UpdateRespons, error) {
+func (UnimplementedUpdatersServer) UpdatesJSON(context.Context, *UpdatesRequest) (*BoolRespons, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdatesJSON not implemented")
+}
+func (UnimplementedUpdatersServer) UpdateJSON(context.Context, *UpdateStrRequest) (*BoolRespons, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateJSON not implemented")
+}
+func (UnimplementedUpdatersServer) Update(context.Context, *UpdateRequest) (*BoolRespons, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
+}
+func (UnimplementedUpdatersServer) Ping(context.Context, *EmtyRequest) (*BoolRespons, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
+}
+func (UnimplementedUpdatersServer) ValueJSON(context.Context, *UpdatesRequest) (*FullRespons, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ValueJSON not implemented")
+}
+func (UnimplementedUpdatersServer) Value(context.Context, *UpdatesRequest) (*StatusRespons, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Value not implemented")
+}
+func (UnimplementedUpdatersServer) ListMetrics(context.Context, *EmtyRequest) (*StatusRespons, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListMetrics not implemented")
 }
 func (UnimplementedUpdatersServer) mustEmbedUnimplementedUpdatersServer() {}
 
@@ -68,6 +152,42 @@ type UnsafeUpdatersServer interface {
 
 func RegisterUpdatersServer(s grpc.ServiceRegistrar, srv UpdatersServer) {
 	s.RegisterService(&Updaters_ServiceDesc, srv)
+}
+
+func _Updaters_UpdatesJSON_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UpdatersServer).UpdatesJSON(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.Updaters/UpdatesJSON",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UpdatersServer).UpdatesJSON(ctx, req.(*UpdatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Updaters_UpdateJSON_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateStrRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UpdatersServer).UpdateJSON(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.Updaters/UpdateJSON",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UpdatersServer).UpdateJSON(ctx, req.(*UpdateStrRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Updaters_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -88,6 +208,78 @@ func _Updaters_Update_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Updaters_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmtyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UpdatersServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.Updaters/Ping",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UpdatersServer).Ping(ctx, req.(*EmtyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Updaters_ValueJSON_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UpdatersServer).ValueJSON(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.Updaters/ValueJSON",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UpdatersServer).ValueJSON(ctx, req.(*UpdatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Updaters_Value_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UpdatersServer).Value(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.Updaters/Value",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UpdatersServer).Value(ctx, req.(*UpdatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Updaters_ListMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmtyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UpdatersServer).ListMetrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.Updaters/ListMetrics",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UpdatersServer).ListMetrics(ctx, req.(*EmtyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Updaters_ServiceDesc is the grpc.ServiceDesc for Updaters service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -96,8 +288,32 @@ var Updaters_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*UpdatersServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "UpdatesJSON",
+			Handler:    _Updaters_UpdatesJSON_Handler,
+		},
+		{
+			MethodName: "UpdateJSON",
+			Handler:    _Updaters_UpdateJSON_Handler,
+		},
+		{
 			MethodName: "Update",
 			Handler:    _Updaters_Update_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _Updaters_Ping_Handler,
+		},
+		{
+			MethodName: "ValueJSON",
+			Handler:    _Updaters_ValueJSON_Handler,
+		},
+		{
+			MethodName: "Value",
+			Handler:    _Updaters_Value_Handler,
+		},
+		{
+			MethodName: "ListMetrics",
+			Handler:    _Updaters_ListMetrics_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

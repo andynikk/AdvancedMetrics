@@ -16,20 +16,20 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andynikk/advancedmetrics/internal/constants/errs"
-	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/mem"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
 	"github.com/andynikk/advancedmetrics/internal/compression"
 	"github.com/andynikk/advancedmetrics/internal/constants"
+	"github.com/andynikk/advancedmetrics/internal/constants/errs"
 	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/grpchandlers/api"
 	"github.com/andynikk/advancedmetrics/internal/repository"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 type MetricsGauge map[string]repository.Gauge
@@ -43,8 +43,9 @@ type data struct {
 }
 
 type agent struct {
-	cfg           *environment.AgentConfig
-	KeyEncryption *encryption.KeyEncryption
+	cfg            *environment.AgentConfig
+	KeyEncryption  *encryption.KeyEncryption
+	GRPCClientConn *grpc.ClientConn
 	data
 }
 
@@ -201,59 +202,27 @@ func (a *agent) Post2Server(allMterics []byte) error {
 
 func (a *agent) Post2gRPSServer(allMterics []byte) error {
 
-	conn, err := grpc.Dial(constants.AddressServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var hdr string
-	hdr += "Content-Type:application/json\n"
-	hdr += "Content-Encoding:gzip\n"
-	hdr += fmt.Sprintf("X-Real-IP:%s\n", a.cfg.IPAddress)
+	c := api.NewUpdatersClient(a.GRPCClientConn)
+	mHeader := map[string]string{"Content-Type": "application/json",
+		"Content-Encoding": "gzip",
+		"X-Real-IP":        a.cfg.IPAddress}
 	if a.KeyEncryption != nil && a.KeyEncryption.PublicKey != nil {
-		hdr += fmt.Sprintf("Content-Encryption:%s\n", a.KeyEncryption.TypeEncryption)
+		mHeader["Content-Encryption"] = a.KeyEncryption.TypeEncryption
 	}
 
-	c := api.NewUpdatersClient(conn)
-
-	res, err := c.Update(context.Background(), &api.UpdateRequest{Header: []byte(hdr), Body: allMterics})
+	md := metadata.New(mHeader)
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	res, err := c.UpdatesJSON(ctx, &api.UpdatesRequest{Body: allMterics})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	ok := res.GetResult()
 	if !ok {
 		return errs.ErrSendMsgGPRC
 	}
 
 	return nil
-
-	//addressPost := fmt.Sprintf("http://%s/updates", a.cfg.Address)
-	//
-	//req, err := http.NewRequest("POST", addressPost, bytes.NewReader(allMterics))
-	//if err != nil {
-	//
-	//	constants.Logger.ErrorLog(err)
-	//
-	//	return errors.New("-- ошибка отправки данных на сервер (1)")
-	//}
-	//req.Header.Set("Content-Type", "application/json")
-	//req.Header.Set("Content-Encoding", "gzip")
-	//req.Header.Set("X-Real-IP", a.cfg.IPAddress)
-	//if a.KeyEncryption != nil && a.KeyEncryption.PublicKey != nil {
-	//	req.Header.Set("Content-Encryption", a.KeyEncryption.TypeEncryption)
-	//}
-	//
-	//defer req.Body.Close()
-	//
-	//client := &http.Client{}
-	//resp, err := client.Do(req)
-	//if err != nil {
-	//	constants.Logger.ErrorLog(err)
-	//	return errors.New("-- ошибка отправки данных на сервер (2)")
-	//}
-	//defer resp.Body.Close()
-	//
-	//return nil
 }
 
 func (a *agent) goPost2Server(matricsButch MapMetricsButch) error {
@@ -266,15 +235,17 @@ func (a *agent) goPost2Server(matricsButch MapMetricsButch) error {
 			return err
 		}
 
-		//if err = a.Post2Server(gziparrMetrics); err != nil {
-		//	constants.Logger.ErrorLog(err)
-		//	return err
-		//}
-
-		err = a.Post2gRPSServer(gziparrMetrics)
-		if err != nil {
-			constants.Logger.ErrorLog(err)
-			return err
+		switch a.cfg.TypeSrv {
+		case constants.TypeSrvGRPC.String():
+			if err = a.Post2gRPSServer(gziparrMetrics); err != nil {
+				constants.Logger.ErrorLog(err)
+				return err
+			}
+		default:
+			if err = a.Post2Server(gziparrMetrics); err != nil {
+				constants.Logger.ErrorLog(err)
+				return err
+			}
 		}
 	}
 
@@ -361,13 +332,10 @@ func main() {
 		},
 		KeyEncryption: certPublicKey,
 	}
-
-	//err := a.Post2gRPSServer([]byte{})
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//return
+	if a.cfg.TypeSrv == constants.TypeSrvGRPC.String() {
+		conn, _ := grpc.Dial(constants.AddressServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		a.GRPCClientConn = conn
+	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 

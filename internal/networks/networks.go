@@ -7,7 +7,7 @@ import (
 )
 
 func AddressAllowed(IPs []string) bool {
-	_, ipv4Net, _ := net.ParseCIDR("192.168.1.0/24")
+	_, ipv4Net, _ := net.ParseCIDR(constants.TrustedSubnet)
 
 	for _, sIP := range IPs {
 		ip := net.ParseIP(sIP)

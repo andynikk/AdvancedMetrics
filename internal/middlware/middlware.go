@@ -1,17 +1,25 @@
 package middlware
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"github.com/andynikk/advancedmetrics/internal/constants"
 	"github.com/andynikk/advancedmetrics/internal/networks"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 func CheckIP(endpoint func(http.ResponseWriter, *http.Request)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		xRealIP := r.Header.Get("X-Real-IP")
+		if xRealIP == "" {
+			w.WriteHeader(http.StatusOK)
+			endpoint(w, r)
+			return
+		}
 
 		ok := networks.AddressAllowed(strings.Split(xRealIP, constants.SepIPAddress))
 		if ok {
@@ -26,4 +34,28 @@ func CheckIP(endpoint func(http.ResponseWriter, *http.Request)) http.Handler {
 			constants.Logger.ErrorLog(err)
 		}
 	})
+}
+
+func serverInterceptor(ctx context.Context,
+	req interface{},
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler) (interface{}, error) {
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, nil
+	}
+	xRealIP := md[strings.ToLower("X-Real-IP")]
+	for _, val := range xRealIP {
+		ok = networks.AddressAllowed(strings.Split(val, constants.SepIPAddress))
+		if !ok {
+			return nil, nil
+		}
+	}
+	h, _ := handler(ctx, req)
+	return h, nil
+}
+
+func WithServerUnaryInterceptor() grpc.ServerOption {
+	return grpc.UnaryInterceptor(serverInterceptor)
 }

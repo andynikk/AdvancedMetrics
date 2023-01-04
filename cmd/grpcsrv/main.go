@@ -12,6 +12,7 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/general"
 	"github.com/andynikk/advancedmetrics/internal/grpchandlers"
 	"github.com/andynikk/advancedmetrics/internal/grpchandlers/api"
+	"github.com/andynikk/advancedmetrics/internal/middlware"
 	"google.golang.org/grpc"
 )
 
@@ -34,7 +35,7 @@ func main() {
 	fmt.Println(server.storege.Config.Address)
 
 	gRepStore := general.New[grpchandlers.RepStore]()
-	gRepStore.Set("grpchandlers", server.storege)
+	gRepStore.Set(constants.TypeSrvGRPC.String(), server.storege)
 
 	if server.storege.Config.Restore {
 		go gRepStore.RestoreData()
@@ -42,7 +43,7 @@ func main() {
 
 	go gRepStore.BackupData()
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(middlware.WithServerUnaryInterceptor())
 	srv := &api.GRPCServer{
 		gRepStore,
 	}

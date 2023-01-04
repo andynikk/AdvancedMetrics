@@ -159,6 +159,8 @@ func (sc *ServerConfig) InitConfigServerENV() {
 
 	_, ipv4Net, _ := net.ParseCIDR(trustedSubnet)
 	sc.TrustedSubnet = ipv4Net
+
+	constants.TrustedSubnet = ipv4Net.String()
 }
 
 func (sc *ServerConfig) InitConfigServerFlag() {
@@ -221,9 +223,11 @@ func (sc *ServerConfig) InitConfigServerFlag() {
 	if len(sc.TypeMetricsStorage) == 0 {
 		sc.TypeMetricsStorage = MapTypeStore
 	}
-	if sc.TrustedSubnet.String() == "" {
+	if sc.TrustedSubnet == nil {
 		_, ipv4Net, _ := net.ParseCIDR(*trustedSubnet)
 		sc.TrustedSubnet = ipv4Net
+
+		constants.TrustedSubnet = ipv4Net.String()
 	}
 }
 
@@ -276,9 +280,11 @@ func (sc *ServerConfig) InitConfigServerFile() {
 	if len(sc.TypeMetricsStorage) == 0 {
 		sc.TypeMetricsStorage = MapTypeStore
 	}
-	if sc.TrustedSubnet.String() == "" {
+	if sc.TrustedSubnet == nil {
 		_, ipv4Net, _ := net.ParseCIDR(trustedSubnet)
 		sc.TrustedSubnet = ipv4Net
+
+		constants.TrustedSubnet = ipv4Net.String()
 	}
 }
 

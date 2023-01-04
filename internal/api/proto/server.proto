@@ -5,14 +5,56 @@ package api;
 option go_package = "./";
 
 service Updaters {
-  rpc Update(UpdateRequest) returns (UpdateRespons) {}
+  rpc UpdatesJSON(UpdatesRequest) returns (BoolRespons) {}
+  rpc UpdateJSON(UpdateStrRequest) returns (BoolRespons) {}
+  rpc Update(UpdateRequest) returns (BoolRespons) {}
+
+  rpc Ping(EmtyRequest) returns (BoolRespons) {}
+
+  rpc ValueJSON(UpdatesRequest) returns (FullRespons) {}
+  rpc Value(UpdatesRequest) returns (StatusRespons) {}
+
+  rpc ListMetrics(EmtyRequest) returns (StatusRespons) {}
 }
 
 message UpdateRequest {
   bytes header = 1;
-  bytes body = 2;
+  bytes metType = 2;
+  bytes metName = 3;
+  bytes metValue = 4;
 }
 
-message UpdateRespons {
+message UpdatesRequest {
+  bytes body = 1;
+}
+
+message EmtyRequest {
+
+}
+
+message UpdateStrRequest {
+  bytes body = 1;
+}
+
+
+message ValueRequest {
+  bytes metType = 1;
+  bytes metName = 2;
+}
+
+
+/////////////////////////Respons///////////////////////
+message BoolRespons {
   bool result = 1;
+}
+
+message StatusRespons {
+  bytes result = 1;
+  int32 status = 2;
+}
+
+message FullRespons {
+  bytes header = 1;
+  bytes body = 2;
+  bool result = 3;
 }

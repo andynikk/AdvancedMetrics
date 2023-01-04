@@ -9,7 +9,9 @@ import (
 	"syscall"
 
 	"github.com/andynikk/advancedmetrics/internal/constants"
+	"github.com/andynikk/advancedmetrics/internal/general"
 	"github.com/andynikk/advancedmetrics/internal/handlers"
+	"github.com/andynikk/advancedmetrics/internal/handlers/api"
 )
 
 type server struct {
@@ -20,18 +22,6 @@ var buildVersion = "N/A"
 var buildDate = "N/A"
 var buildCommit = "N/A"
 
-// Shutdown working out the service stop.
-// We save the current values of metrics in the database.
-func Shutdown(rs *handlers.RepStore) {
-	rs.Lock()
-	defer rs.Unlock()
-
-	for _, val := range rs.Config.TypeMetricsStorage {
-		val.WriteMetric(rs.PrepareDataBU())
-	}
-	constants.Logger.InfoLog("server stopped")
-}
-
 func main() {
 
 	fmt.Println(fmt.Sprintf("Build version: %s", buildVersion))
@@ -39,18 +29,29 @@ func main() {
 	fmt.Println(fmt.Sprintf("Build commit: %s", buildCommit))
 
 	server := new(server)
-	handlers.NewRepStore(&server.storege)
+	api.NewRepStore(&server.storege)
 	fmt.Println(server.storege.Config.Address)
-	if server.storege.Config.Restore {
-		go server.storege.RestoreData()
+
+	gRepStore := general.New[handlers.RepStore]()
+	gRepStore.Set(constants.TypeSrvHTTP.String(), server.storege)
+
+	srv := api.HTTPServer{
+		RepStore: gRepStore,
 	}
 
-	go server.storege.BackupData()
+	api.InitRoutersMux(&srv)
+
+	if server.storege.Config.Restore {
+		go srv.RepStore.RestoreData()
+	}
+
+	go srv.RepStore.BackupData()
 
 	go func() {
 		s := &http.Server{
 			Addr:    server.storege.Config.Address,
-			Handler: server.storege.Router}
+			Handler: srv.Router,
+		}
 
 		if err := s.ListenAndServe(); err != nil {
 			constants.Logger.ErrorLog(err)
@@ -60,5 +61,5 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	<-stop
-	Shutdown(&server.storege)
+	gRepStore.Shutdown()
 }

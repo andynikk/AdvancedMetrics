@@ -21,6 +21,7 @@ type AgentConfigENV struct {
 	Key            string        `env:"KEY"`
 	CryptoKey      string        `env:"CRYPTO_KEY"`
 	Config         string        `env:"CONFIG"`
+	TypeSrv        string        `env:"TYPE_SRV"`
 }
 
 type AgentConfig struct {
@@ -31,6 +32,7 @@ type AgentConfig struct {
 	CryptoKey      string
 	ConfigFilePath string
 	IPAddress      string
+	TypeSrv        string
 }
 
 type AgentConfigFile struct {
@@ -110,12 +112,18 @@ func (ac *AgentConfig) InitConfigAgentENV() {
 		patchCryptoKey = cfgENV.CryptoKey
 	}
 
+	typeSrv := ""
+	if _, ok := os.LookupEnv("TYPE_SRV"); ok {
+		typeSrv = cfgENV.TypeSrv
+	}
+
 	ac.Address = addressServ
 	ac.ReportInterval = reportIntervalMetric
 	ac.PollInterval = pollIntervalMetrics
 	ac.Key = keyHash
 	ac.CryptoKey = patchCryptoKey
 	ac.ConfigFilePath = pathFileCfg
+	ac.TypeSrv = typeSrv
 }
 
 func (ac *AgentConfig) InitConfigAgentFlag() {
@@ -193,6 +201,8 @@ func (ac *AgentConfig) InitConfigAgentDefault() {
 	addressServ := constants.AddressServer
 	reportIntervalMetric := constants.ReportInterval * time.Second
 	pollIntervalMetrics := constants.PollInterval * time.Second
+	typeSrv := constants.TypeSrvGRPC.String()
+	//typeSrv := constants.TypeSrvHTTP.String()
 
 	if ac.Address == "" {
 		ac.Address = addressServ
@@ -202,6 +212,9 @@ func (ac *AgentConfig) InitConfigAgentDefault() {
 	}
 	if ac.PollInterval == 0 {
 		ac.PollInterval = pollIntervalMetrics
+	}
+	if ac.TypeSrv == "" {
+		ac.TypeSrv = typeSrv
 	}
 
 	hn, _ := os.Hostname()

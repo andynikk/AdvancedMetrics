@@ -19,10 +19,21 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
-	grpchandlers "github.com/andynikk/advancedmetrics/internal/grpchandlers"
+	"github.com/andynikk/advancedmetrics/internal/grpchandlers"
 	"github.com/andynikk/advancedmetrics/internal/handlers"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 )
+
+type MetricType int
+
+const (
+	GaugeMetric MetricType = iota
+	CounterMetric
+)
+
+func (mt MetricType) String() string {
+	return [...]string{"gauge", "counter"}[mt]
+}
 
 type IRepStore interface {
 	handlers.RepStore | grpchandlers.RepStore
@@ -32,6 +43,14 @@ type Header map[string]string
 
 type RepStore[T IRepStore] struct {
 	data map[string]T
+}
+
+func New[T IRepStore]() RepStore[T] {
+
+	c := RepStore[T]{}
+	c.data = make(map[string]T)
+
+	return c
 }
 
 func (rs *RepStore[T]) Set(key string, value T) {
@@ -46,22 +65,12 @@ func (rs *RepStore[T]) Get(key string) (v T) {
 	return
 }
 
-func New[T IRepStore]() RepStore[T] {
-
-	c := RepStore[T]{}
-	c.data = make(map[string]T)
-
-	return c
-}
-
 func (rs *RepStore[T]) getPKRepStore() *encryption.KeyEncryption {
-	keyG := "grpchandlers"
-	if t, ok := rs.data[keyG]; ok {
+	if t, ok := rs.data[constants.TypeSrvGRPC.String()]; ok {
 		return any(t).(grpchandlers.RepStore).PK
 	}
 
-	keyH := "handlers"
-	if t, ok := rs.data[keyH]; ok {
+	if t, ok := rs.data[constants.TypeSrvHTTP.String()]; ok {
 		return any(t).(handlers.RepStore).PK
 	}
 
@@ -69,13 +78,11 @@ func (rs *RepStore[T]) getPKRepStore() *encryption.KeyEncryption {
 }
 
 func (rs *RepStore[T]) getConfigRepStore() *environment.ServerConfig {
-	keyG := "grpchandlers"
-	if t, ok := rs.data[keyG]; ok {
+	if t, ok := rs.data[constants.TypeSrvGRPC.String()]; ok {
 		return any(t).(grpchandlers.RepStore).Config
 	}
 
-	keyH := "handlers"
-	if t, ok := rs.data[keyH]; ok {
+	if t, ok := rs.data[constants.TypeSrvHTTP.String()]; ok {
 		return any(t).(handlers.RepStore).Config
 	}
 
@@ -83,13 +90,11 @@ func (rs *RepStore[T]) getConfigRepStore() *environment.ServerConfig {
 }
 
 func (rs *RepStore[T]) getSyncMapMetricsRepStore() *repository.SyncMapMetrics {
-	keyG := "grpchandlers"
-	if t, ok := rs.data[keyG]; ok {
+	if t, ok := rs.data[constants.TypeSrvGRPC.String()]; ok {
 		return any(t).(grpchandlers.RepStore).SyncMapMetrics
 	}
 
-	keyH := "handlers"
-	if t, ok := rs.data[keyH]; ok {
+	if t, ok := rs.data[constants.TypeSrvHTTP.String()]; ok {
 		return any(t).(handlers.RepStore).SyncMapMetrics
 	}
 
@@ -118,7 +123,7 @@ func (rs *RepStore[T]) RestoreData() {
 	rs.SetValueInMapJSON(arrMetricsAll)
 }
 
-func (rs *RepStore[T]) SetValueInMapJSON(a []encoding.Metrics) int {
+func (rs *RepStore[T]) SetValueInMapJSON(a []encoding.Metrics) error {
 
 	key := rs.getConfigRepStore().Key
 	smm := rs.getSyncMapMetricsRepStore()
@@ -130,7 +135,7 @@ func (rs *RepStore[T]) SetValueInMapJSON(a []encoding.Metrics) int {
 		var heshVal string
 
 		switch v.MType {
-		case handlers.GaugeMetric.String():
+		case GaugeMetric.String():
 			var valValue float64
 			valValue = *v.Value
 
@@ -140,7 +145,7 @@ func (rs *RepStore[T]) SetValueInMapJSON(a []encoding.Metrics) int {
 				valG := repository.Gauge(0)
 				smm.MutexRepo[v.ID] = &valG
 			}
-		case handlers.CounterMetric.String():
+		case CounterMetric.String():
 			var valDelta int64
 			valDelta = *v.Delta
 
@@ -151,7 +156,7 @@ func (rs *RepStore[T]) SetValueInMapJSON(a []encoding.Metrics) int {
 				smm.MutexRepo[v.ID] = &valC
 			}
 		default:
-			return http.StatusNotImplemented
+			return errs.ErrNotImplemented
 		}
 
 		heshAgent := []byte(v.Hash)
@@ -161,11 +166,11 @@ func (rs *RepStore[T]) SetValueInMapJSON(a []encoding.Metrics) int {
 
 		if v.Hash != "" && !hmacEqual {
 			constants.Logger.InfoLog(fmt.Sprintf("++ %s - %s", v.Hash, heshVal))
-			return http.StatusBadRequest
+			return errs.ErrBadRequest
 		}
 		smm.MutexRepo[v.ID].Set(v)
 	}
-	return http.StatusOK
+	return nil
 
 }
 
@@ -204,6 +209,49 @@ func (rs *RepStore[T]) PrepareDataBU() encoding.ArrMetrics {
 	return storedData
 }
 
+// Добавляет в хранилище метрику. Определяет тип метрики (gauge, counter).
+// В зависимости от типа добавляет нужное значение.
+// При успешном выполнении возвращает http-статус "ОК" (200)
+func (rs *RepStore[T]) setValueInMap(metType string, metName string, metValue string) int {
+
+	smm := rs.getSyncMapMetricsRepStore()
+	switch metType {
+	case GaugeMetric.String():
+		if val, findKey := smm.MutexRepo[metName]; findKey {
+			if ok := val.SetFromText(metValue); !ok {
+				return http.StatusBadRequest
+			}
+		} else {
+
+			valG := repository.Gauge(0)
+			if ok := valG.SetFromText(metValue); !ok {
+				return http.StatusBadRequest
+			}
+
+			smm.MutexRepo[metName] = &valG
+		}
+
+	case CounterMetric.String():
+		if val, findKey := smm.MutexRepo[metName]; findKey {
+			if ok := val.SetFromText(metValue); !ok {
+				return http.StatusBadRequest
+			}
+		} else {
+
+			valC := repository.Counter(0)
+			if ok := valC.SetFromText(metValue); !ok {
+				return http.StatusBadRequest
+			}
+
+			smm.MutexRepo[metName] = &valC
+		}
+	default:
+		return http.StatusNotImplemented
+	}
+
+	return http.StatusOK
+}
+
 // Shutdown working out the service stop.
 // We save the current values of metrics in the database.
 func (rs *RepStore[T]) Shutdown() {
@@ -225,8 +273,8 @@ func (rs *RepStore[T]) Shutdown() {
 // Может принимать JSON в жатом виде gzip. Сохраняет значение в физическое и временное хранилище.
 func (rs *RepStore[T]) HandlerUpdatesMetricJSON(h Header, b []byte) error {
 
-	contentEncoding := h["Content-Encoding"]
-	contentEncryption := h["Content-Encryption"]
+	contentEncoding := h["content-encoding"]
+	contentEncryption := h["content-encryption"]
 
 	PK := rs.getPKRepStore()
 
@@ -246,11 +294,115 @@ func (rs *RepStore[T]) HandlerUpdatesMetricJSON(h Header, b []byte) error {
 		}
 	}
 	if err = rs.Updates(b); err != nil {
-		if err == errs.ErrStatusInternalServer {
+		return err
+	}
+
+	return nil
+}
+
+// HandlerUpdateMetricJSON Handler, который работает с POST запросом формата "/update".
+// В теле получает JSON со значением метрики. Струтура JSON: encoding.Metrics.
+// Может принимать JSON в жатом виде gzip.
+// Сохраняет значение в физическое и временное хранилище.
+func (rs *RepStore[T]) HandlerUpdateMetricJSON(h Header, b []byte) error {
+
+	contentEncoding := h["content-encoding"]
+	contentEncryption := h["content-encryption"]
+
+	err := errors.New("")
+	if strings.Contains(contentEncryption, constants.TypeEncryption) {
+		PK := rs.getPKRepStore()
+		b, err = PK.RsaDecrypt(b)
+		if err != nil {
+			constants.Logger.ErrorLog(err)
+			return errs.ErrDecrypt
+		}
+	}
+
+	if strings.Contains(contentEncoding, "gzip") {
+		b, err = compression.Decompress(b)
+		if err != nil {
+			constants.Logger.InfoLog(fmt.Sprintf("$$ 2 %s", err.Error()))
 			return errs.ErrDecompress
 		}
 	}
 
+	bodyJSON := bytes.NewReader(b)
+
+	var v []encoding.Metrics
+	err = json.NewDecoder(bodyJSON).Decode(&v)
+	if err != nil {
+		constants.Logger.InfoLog(fmt.Sprintf("$$ 3 %s", err.Error()))
+		return errs.ErrGetJSON
+	}
+
+	err = rs.SetValueInMapJSON(v)
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+		return err
+	}
+	smm := rs.getSyncMapMetricsRepStore()
+	cfg := rs.getConfigRepStore()
+
+	var arrMetrics encoding.ArrMetrics
+	for _, val := range v {
+		mt := smm.MutexRepo[val.ID].GetMetrics(val.MType, val.ID, cfg.Key)
+		//metricsJSON, err := mt.MarshalMetrica()
+		//if err != nil {
+		//	constants.Logger.ErrorLog(err)
+		//	return err
+		//}
+		//if _, err := rw.Write(metricsJSON); err != nil {
+		//	constants.Logger.ErrorLog(err)
+		//	return err
+		//}
+		arrMetrics = append(arrMetrics, mt)
+	}
+
+	for _, val := range cfg.TypeMetricsStorage {
+		val.WriteMetric(arrMetrics)
+	}
+
+	return nil
+}
+
+func (rs *RepStore[T]) HandlerSetMetricaPOST(metType string, metName string, metValue string) error {
+
+	smm := rs.getSyncMapMetricsRepStore()
+	smm.Lock()
+	defer smm.Unlock()
+
+	res := rs.setValueInMap(metType, metName, metValue)
+	switch res {
+	case 200:
+		return nil
+	case 400:
+		return errs.ErrBadRequest
+	case 501:
+		return errs.ErrNotImplemented
+	default:
+		return errs.ErrStatusInternalServer
+	}
+}
+
+// HandlerPingDB Handler, который работает с GET запросом формата "/ping"
+// Handler проверяет соединение с физическим хранилищем метрик.
+// Физическое хранилище регулируется параметром среды "DATABASE_DSN" или флагом "d"
+// Если заполнено "DATABASE_DSN" или "d", то это база данных. Иначе файл.
+func (rs *RepStore[T]) HandlerPingDB(h Header) error {
+
+	cfg := rs.getConfigRepStore()
+
+	mapTypeStore := cfg.TypeMetricsStorage
+	if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
+		constants.Logger.ErrorLog(errors.New("соединение с базой отсутствует"))
+		return errs.ErrStatusInternalServer
+	}
+
+	if mapTypeStore[constants.MetricsStorageDB.String()].ConnDB() == nil {
+		constants.Logger.ErrorLog(errors.New("соединение с базой отсутствует"))
+		return errs.ErrStatusInternalServer
+	}
 	return nil
 }
 
@@ -265,12 +417,14 @@ func (rs *RepStore[T]) Updates(msg []byte) error {
 	}
 
 	var storedData encoding.ArrMetrics
-	if err := json.Unmarshal(respByte, &storedData); err != nil {
+	if err = json.Unmarshal(respByte, &storedData); err != nil {
 		constants.Logger.ErrorLog(err)
 		return errs.ErrStatusInternalServer
 	}
 
-	rs.SetValueInMapJSON(storedData)
+	if err = rs.SetValueInMapJSON(storedData); err != nil {
+		return err
+	}
 
 	typeMetricsStorage := rs.getConfigRepStore().TypeMetricsStorage
 	for _, val := range typeMetricsStorage {
@@ -278,4 +432,156 @@ func (rs *RepStore[T]) Updates(msg []byte) error {
 	}
 
 	return nil
+}
+
+// HandlerValueMetricaJSON Handler, который работает с POST запросом формата "/value".
+// В теле получает JSON с имененм типа и именем метрики. Струтура JSON: encoding.Metrics.
+// Может принимать JSON в жатом виде gzip. Возвращает значение метрики по типу и наименованию.
+func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b []byte) (Header, []byte, error) {
+
+	acceptEncoding := h["accept-encoding"]
+	contentEncoding := h["content-encoding"]
+	contentEncryption := h["content-encryption"]
+
+	PK := rs.getPKRepStore()
+	err := errors.New("")
+	if strings.Contains(contentEncryption, constants.TypeEncryption) {
+		b, err = PK.RsaDecrypt(b)
+		if err != nil {
+			constants.Logger.ErrorLog(err)
+			return nil, nil, errs.ErrDecrypt
+		}
+	}
+
+	if strings.Contains(contentEncoding, "gzip") {
+		b, err = compression.Decompress(b)
+		if err != nil {
+			constants.Logger.ErrorLog(err)
+			return nil, nil, errs.ErrDecompress
+		}
+	}
+
+	bodyJSON := bytes.NewReader(b)
+
+	v := encoding.Metrics{}
+	err = json.NewDecoder(bodyJSON).Decode(&v)
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+		return nil, nil, errs.ErrGetJSON
+	}
+	metType := v.MType
+	metName := v.ID
+
+	smm := rs.getSyncMapMetricsRepStore()
+	cfg := rs.getConfigRepStore()
+
+	smm.Lock()
+	defer smm.Unlock()
+
+	if _, findKey := smm.MutexRepo[metName]; !findKey {
+
+		constants.Logger.InfoLog(fmt.Sprintf("== %d %s %d %s", 1, metName, len(smm.MutexRepo), cfg.DatabaseDsn))
+		return nil, nil, errs.ErrNotFound
+	}
+
+	mt := smm.MutexRepo[metName].GetMetrics(metType, metName, cfg.Key)
+	metricsJSON, err := mt.MarshalMetrica()
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+		return nil, nil, err
+	}
+
+	var bytMterica []byte
+	bt := bytes.NewBuffer(metricsJSON).Bytes()
+	bytMterica = append(bytMterica, bt...)
+	compData, err := compression.Compress(bytMterica)
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+	}
+
+	hReturn := Header{}
+	hReturn["content-type"] = "application/json"
+
+	var bodyBate []byte
+	if strings.Contains(acceptEncoding, "gzip") {
+		hReturn["content-encoding"] = "gzip"
+		bodyBate = compData
+	} else {
+		bodyBate = metricsJSON
+	}
+
+	return hReturn, bodyBate, nil
+}
+
+// HandlerGetValue Handler, который работает с GET запросом формата "/value/{metType}/{metName}"
+// Где metType наименование типа метрики, metName наименование метрики
+func (rs *RepStore[T]) HandlerGetValue(metName []byte) (string, error) {
+
+	smm := rs.getSyncMapMetricsRepStore()
+
+	smm.Lock()
+	defer smm.Unlock()
+
+	if _, findKey := smm.MutexRepo[string(metName)]; !findKey {
+		constants.Logger.InfoLog(fmt.Sprintf("== %d", 3))
+		return "", errs.ErrStatusInternalServer
+	}
+
+	strMetric := smm.MutexRepo[string(metName)].String()
+	return strMetric, nil
+
+}
+
+// HandlerGetAllMetrics Отрабатывает обращение к корневому узлу сервера (/).
+// Выводит на страницу список наименований и значений метрик.
+func (rs *RepStore[T]) HandlerGetAllMetrics(h Header) (Header, []byte) {
+
+	smm := rs.getSyncMapMetricsRepStore()
+	arrMetricsAndValue := smm.MapMetrics.TextMetricsAndValue()
+
+	var strMetrics string
+	content := `<!DOCTYPE html>
+				<html>
+				<head>
+  					<meta charset="UTF-8">
+  					<title>МЕТРИКИ</title>
+				</head>
+				<body>
+				<h1>МЕТРИКИ</h1>
+				<ul>
+				`
+	for _, val := range arrMetricsAndValue {
+		content = content + `<li><b>` + val + `</b></li>` + "\n"
+		if strMetrics != "" {
+			strMetrics = strMetrics + ";"
+		}
+		strMetrics = strMetrics + val
+	}
+	content = content + `</ul>
+						</body>
+						</html>`
+
+	acceptEncoding := h["Accept-Encoding"]
+
+	metricsHTML := []byte(content)
+	byteMterics := bytes.NewBuffer(metricsHTML).Bytes()
+	compData, err := compression.Compress(byteMterics)
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+	}
+
+	HeaderResponse := Header{}
+
+	var bodyBate []byte
+	if strings.Contains(acceptEncoding, "gzip") {
+		HeaderResponse["content-encoding"] = "gzip"
+		bodyBate = compData
+	} else {
+		bodyBate = metricsHTML
+	}
+
+	HeaderResponse["content-type"] = "text/html"
+	HeaderResponse["metrics-val"] = strMetrics
+
+	return HeaderResponse, bodyBate
 }

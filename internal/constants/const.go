@@ -5,6 +5,12 @@ import (
 )
 
 type TypeMetricsStorage int
+type TypeSrv int
+
+const (
+	TypeSrvGRPC TypeSrv = iota
+	TypeSrvHTTP
+)
 
 const (
 	MetricsStorageDB TypeMetricsStorage = iota
@@ -79,4 +85,9 @@ func (tmc TypeMetricsStorage) String() string {
 	return [...]string{"db", "file"}[tmc]
 }
 
+func (ts TypeSrv) String() string {
+	return [...]string{"gRPC", "HTTP"}[ts]
+}
+
 var Logger logger.Logger
+var TrustedSubnet string
