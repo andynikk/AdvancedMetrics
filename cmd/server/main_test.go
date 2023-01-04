@@ -15,8 +15,9 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"github.com/andynikk/advancedmetrics/internal/encryption"
-	"github.com/andynikk/advancedmetrics/internal/environment"
+	"github.com/andynikk/advancedmetrics/internal/general"
 	"github.com/andynikk/advancedmetrics/internal/handlers"
+	"github.com/andynikk/advancedmetrics/internal/handlers/api"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 	"github.com/gorilla/mux"
 )
@@ -25,18 +26,34 @@ func TestFuncServer(t *testing.T) {
 	var fValue float64 = 0.001
 	var iDelta int64 = 10
 
-	rp := new(handlers.RepStore)
+	server := new(server)
+	t.Run("Checking init server", func(t *testing.T) {
+		//rp.Config = environment.InitConfigServer()
+		api.NewRepStore(&server.storege)
+		if server.storege.Config.Address == "" {
+			t.Errorf("Error checking init server")
+		}
+	})
+	fmt.Println(server.storege.Config.Address)
+
+	gRepStore := general.New[handlers.RepStore]()
+	gRepStore.Set(constants.TypeSrvHTTP.String(), server.storege)
+
+	srv := api.HTTPServer{
+		RepStore: gRepStore,
+	}
+
+	rp := srv.RepStore.Get(constants.TypeSrvHTTP.String())
 	rp.MutexRepo = make(repository.MutexRepo)
 
 	t.Run("Checking init router", func(t *testing.T) {
-		handlers.InitRoutersMux(rp)
-		if rp.Router == nil {
+		api.InitRoutersMux(&srv)
+		if srv.Router == nil {
 			t.Errorf("Error checking init router")
 		}
 	})
 
 	t.Run("Checking init config", func(t *testing.T) {
-		rp.Config = environment.InitConfigServer()
 		if rp.Config.Address == "" {
 			t.Errorf("Error checking init config")
 		}
@@ -216,7 +233,7 @@ func TestFuncServer(t *testing.T) {
 			}
 			rp.MutexRepo["TestCounter"] = &valC
 
-			data := rp.PrepareDataBU()
+			data := srv.RepStore.PrepareDataBU()
 			if len(data) != 2 {
 				t.Errorf(`Error method "PrepareDataBU"`)
 			}
@@ -224,7 +241,7 @@ func TestFuncServer(t *testing.T) {
 	})
 
 	t.Run("Checking handlers", func(t *testing.T) {
-		ts := httptest.NewServer(rp.Router)
+		ts := httptest.NewServer(srv.Router)
 		defer ts.Close()
 
 		t.Run("Checking handler /update/{metType}/{metName}/{metValue}/", func(t *testing.T) {
@@ -310,12 +327,15 @@ func TestFuncServer(t *testing.T) {
 
 				r := mux.NewRouter()
 				ts := httptest.NewServer(r)
+				rp := new(api.RepStore)
 
-				rp := new(handlers.RepStore)
-				rp.MutexRepo = make(repository.MutexRepo)
-				rp.Router = nil
+				smm := new(repository.SyncMapMetrics)
+				smm.MutexRepo = make(repository.MutexRepo)
+				rp.SyncMapMetrics = smm
 
-				r.HandleFunc("/update/{metType}/{metName}/{metValue}", rp.HandlerSetMetricaPOST).Methods("POST")
+				srv.Router = nil
+
+				r.HandleFunc("/update/{metType}/{metName}/{metValue}", srv.HandlerSetMetricaPOST).Methods("POST")
 
 				defer ts.Close()
 				resp := testRequest(t, ts, http.MethodPost, tt.request, nil)
@@ -380,7 +400,9 @@ func TestFuncServer(t *testing.T) {
 
 		t.Run("Checking set val in map", func(t *testing.T) {
 			rs := new(handlers.RepStore)
-			rs.MutexRepo = make(map[string]repository.Metric)
+			smm := new(repository.SyncMapMetrics)
+			smm.MutexRepo = make(repository.MutexRepo)
+			rs.SyncMapMetrics = smm
 
 			arrM := testArray(configKey)
 

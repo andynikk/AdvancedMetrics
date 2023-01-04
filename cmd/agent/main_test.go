@@ -15,6 +15,8 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/repository"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func TestmakeMsg(adresServer string, memStats MetricsGauge) string {
@@ -173,9 +175,21 @@ func TestFuncAgen(t *testing.T) {
 
 func BenchmarkSendMetrics(b *testing.B) {
 	a := agent{}
-	ac := &environment.AgentConfig{}
-	a.cfg = ac
-	a.cfg.Address = "localhost:8080"
+	a.cfg = environment.InitConfigAgent()
+	if a.cfg.Address == "" {
+		return
+	}
+
+	if a.cfg.TypeSrv == constants.TypeSrvGRPC.String() {
+		conn, err := grpc.Dial(constants.AddressServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			return
+		}
+		a.GRPCClientConn = conn
+	}
+
+	certPublicKey, _ := encryption.InitPublicKey(a.cfg.CryptoKey)
+	a.KeyEncryption = certPublicKey
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < 10000; i++ {
@@ -194,7 +208,7 @@ func BenchmarkSendMetrics(b *testing.B) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			a.goPost2Server(&mapMetricsButch)
+			a.goPost2Server(mapMetricsButch)
 		}()
 	}
 	wg.Wait()

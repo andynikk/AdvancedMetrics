@@ -5,6 +5,12 @@ import (
 )
 
 type TypeMetricsStorage int
+type TypeSrv int
+
+const (
+	TypeSrvGRPC TypeSrv = iota
+	TypeSrvHTTP
+)
 
 const (
 	MetricsStorageDB TypeMetricsStorage = iota
@@ -71,10 +77,17 @@ const (
 					
 					ALTER TABLE IF EXISTS metrics.store
 						OWNER to postgres;`
+
+	SepIPAddress = ";"
 )
 
 func (tmc TypeMetricsStorage) String() string {
 	return [...]string{"db", "file"}[tmc]
 }
 
+func (ts TypeSrv) String() string {
+	return [...]string{"gRPC", "HTTP"}[ts]
+}
+
 var Logger logger.Logger
+var TrustedSubnet string
