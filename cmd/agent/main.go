@@ -192,7 +192,6 @@ func (a *agent) goPost2Server(metricsButch MapMetricsButch) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
