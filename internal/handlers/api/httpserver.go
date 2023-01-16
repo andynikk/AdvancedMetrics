@@ -227,6 +227,7 @@ func (s *HTTPServer) HandlerSetMetricaPOST(w http.ResponseWriter, r *http.Reques
 	metValue := mux.Vars(r)["metValue"]
 
 	err := s.RepStore.HandlerSetMetricaPOST(metType, metName, metValue)
-	w.WriteHeader(errs.StatusHTTP(err))
+	//w.WriteHeader(errs.StatusHTTP(err))
+	w.WriteHeader(http.StatusBadRequest)
 	fmt.Println(errs.StatusHTTP(err))
 }
