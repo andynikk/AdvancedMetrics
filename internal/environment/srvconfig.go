@@ -25,19 +25,21 @@ type ServerConfigENV struct {
 	CryptoKey     string        `env:"CRYPTO_KEY"`
 	Config        string        `env:"CONFIG"`
 	TrustedSubnet string        `env:"TRUSTED_SUBNET"`
+	TypeServer    string        `env:"TYPE_SRV"`
 }
 
 type ServerConfig struct {
-	StoreInterval      time.Duration
-	StoreFile          string
-	Restore            bool
-	Address            string
-	Key                string
-	DatabaseDsn        string
-	TypeMetricsStorage repository.MapTypeStore
-	CryptoKey          string
-	ConfigFilePath     string
-	TrustedSubnet      *net.IPNet
+	StoreInterval  time.Duration
+	StoreFile      string
+	Restore        bool
+	Address        string
+	Key            string
+	DatabaseDsn    string
+	StorageType    repository.MapTypeStore
+	CryptoKey      string
+	ConfigFilePath string
+	TypeServer     string
+	TrustedSubnet  *net.IPNet
 }
 
 type ServerConfigFile struct {
@@ -58,13 +60,13 @@ func GetServerConfigFile(file *string) ServerConfigFile {
 		return sConfig
 	}
 
-	out := ParsCfgByte(res)
+	out := ParseConfigBytes(res)
 	defer out.Reset()
 
 	if err = json.Unmarshal([]byte(out.String()), &sConfig); err != nil {
 		return sConfig
 	}
-	if ThisOSWindows() {
+	if isOSWindows() {
 		sConfig.CryptoKey = strings.Replace(sConfig.CryptoKey, "/", "\\", -1)
 		sConfig.StoreFile = strings.Replace(sConfig.StoreFile, "/", "\\", -1)
 	}
@@ -81,6 +83,9 @@ func InitConfigServer() *ServerConfig {
 	sc.InitConfigServerFlag()
 	sc.InitConfigServerFile()
 	sc.InitConfigServerDefault()
+
+	sc.StorageType, _ = repository.InitStoreDB(sc.StorageType, sc.DatabaseDsn)
+	sc.StorageType, _ = repository.InitStoreFile(sc.StorageType, sc.StoreFile)
 
 	return &sc
 }
@@ -138,6 +143,11 @@ func (sc *ServerConfig) InitConfigServerENV() {
 		trustedSubnet = cfgENV.TrustedSubnet
 	}
 
+	var typeSrv string
+	if _, ok := os.LookupEnv("TYPE_SRV"); ok {
+		typeSrv = cfgENV.TypeServer
+	}
+
 	MapTypeStore := make(repository.MapTypeStore)
 	if databaseDsn != "" {
 		typeDB := repository.TypeStoreDataDB{}
@@ -153,14 +163,16 @@ func (sc *ServerConfig) InitConfigServerENV() {
 	sc.Address = addressServ
 	sc.Key = keyHash
 	sc.DatabaseDsn = databaseDsn
-	sc.TypeMetricsStorage = MapTypeStore
+	sc.StorageType = MapTypeStore
 	sc.CryptoKey = patchCryptoKey
 	sc.ConfigFilePath = patchFileConfig
+	sc.TypeServer = typeSrv
 
 	_, ipv4Net, _ := net.ParseCIDR(trustedSubnet)
 	sc.TrustedSubnet = ipv4Net
 
 	constants.TrustedSubnet = ipv4Net.String()
+
 }
 
 func (sc *ServerConfig) InitConfigServerFlag() {
@@ -186,7 +198,7 @@ func (sc *ServerConfig) InitConfigServerFlag() {
 	}
 
 	MapTypeStore := make(repository.MapTypeStore)
-	if len(sc.TypeMetricsStorage) == 0 {
+	if len(sc.StorageType) == 0 {
 		if *keyDatabaseDsn != "" {
 			typeDB := repository.TypeStoreDataDB{}
 			MapTypeStore[constants.MetricsStorageDB.String()] = &typeDB
@@ -220,8 +232,8 @@ func (sc *ServerConfig) InitConfigServerFlag() {
 	if sc.ConfigFilePath == "" {
 		sc.ConfigFilePath = pathFileCfg
 	}
-	if len(sc.TypeMetricsStorage) == 0 {
-		sc.TypeMetricsStorage = MapTypeStore
+	if len(sc.StorageType) == 0 {
+		sc.StorageType = MapTypeStore
 	}
 	if sc.TrustedSubnet == nil {
 		_, ipv4Net, _ := net.ParseCIDR(*trustedSubnet)
@@ -249,7 +261,7 @@ func (sc *ServerConfig) InitConfigServerFile() {
 	trustedSubnet := jsonCfg.TrustedSubnet
 
 	MapTypeStore := make(repository.MapTypeStore)
-	if len(sc.TypeMetricsStorage) == 0 {
+	if len(sc.StorageType) == 0 {
 		if databaseDsn != "" {
 			typeDB := repository.TypeStoreDataDB{}
 			MapTypeStore[constants.MetricsStorageDB.String()] = &typeDB
@@ -277,8 +289,8 @@ func (sc *ServerConfig) InitConfigServerFile() {
 	if sc.CryptoKey == "" {
 		sc.CryptoKey = patchCryptoKey
 	}
-	if len(sc.TypeMetricsStorage) == 0 {
-		sc.TypeMetricsStorage = MapTypeStore
+	if len(sc.StorageType) == 0 {
+		sc.StorageType = MapTypeStore
 	}
 	if sc.TrustedSubnet == nil {
 		_, ipv4Net, _ := net.ParseCIDR(trustedSubnet)
@@ -301,5 +313,10 @@ func (sc *ServerConfig) InitConfigServerDefault() {
 	}
 	if !sc.Restore {
 		sc.Restore = constants.Restore
+	}
+
+	if sc.TypeServer == "" {
+		sc.TypeServer = constants.TypeSrvHTTP.String()
+		//sc.TypeServer = constants.TypeSrvGRPC.String()
 	}
 }

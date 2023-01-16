@@ -106,9 +106,9 @@ func (rs *RepStore[T]) RestoreData() {
 	var arrMetricsAll []encoding.Metrics
 
 	config := rs.getConfigRepStore()
-	typeMetricsStorage := config.TypeMetricsStorage
+	storageType := config.StorageType
 
-	for _, valMetric := range typeMetricsStorage {
+	for _, valMetric := range storageType {
 
 		arrMetrics, err := valMetric.GetMetric()
 		if err != nil {
@@ -177,7 +177,7 @@ func (rs *RepStore[T]) SetValueInMapJSON(a []encoding.Metrics) error {
 func (rs *RepStore[T]) BackupData() {
 
 	rsConfig := rs.getConfigRepStore()
-	typeMetricsStorage := rsConfig.TypeMetricsStorage
+	storageType := rsConfig.StorageType
 	storeInterval := rsConfig.StoreInterval
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -186,8 +186,8 @@ func (rs *RepStore[T]) BackupData() {
 		select {
 		case <-saveTicker.C:
 
-			for _, val := range typeMetricsStorage {
-				val.WriteMetric(rs.PrepareDataBU())
+			for _, val := range storageType {
+				val.WriteMetric(rs.PrepareDataForBackup())
 			}
 
 		case <-ctx.Done():
@@ -197,7 +197,7 @@ func (rs *RepStore[T]) BackupData() {
 	}
 }
 
-func (rs *RepStore[T]) PrepareDataBU() encoding.ArrMetrics {
+func (rs *RepStore[T]) PrepareDataForBackup() encoding.ArrMetrics {
 
 	cKey := rs.getConfigRepStore().Key
 	smm := rs.getSyncMapMetricsRepStore()
@@ -256,14 +256,14 @@ func (rs *RepStore[T]) setValueInMap(metType string, metName string, metValue st
 // We save the current values of metrics in the database.
 func (rs *RepStore[T]) Shutdown() {
 
-	typeMetricsStorage := rs.getConfigRepStore().TypeMetricsStorage
+	storageType := rs.getConfigRepStore().StorageType
 	smm := rs.getSyncMapMetricsRepStore()
 
 	smm.Lock()
 	defer smm.Unlock()
 
-	for _, val := range typeMetricsStorage {
-		val.WriteMetric(rs.PrepareDataBU())
+	for _, val := range storageType {
+		val.WriteMetric(rs.PrepareDataForBackup())
 	}
 	constants.Logger.InfoLog("server stopped")
 }
@@ -347,19 +347,10 @@ func (rs *RepStore[T]) HandlerUpdateMetricJSON(h Header, b []byte) error {
 	var arrMetrics encoding.ArrMetrics
 	for _, val := range v {
 		mt := smm.MutexRepo[val.ID].GetMetrics(val.MType, val.ID, cfg.Key)
-		//metricsJSON, err := mt.MarshalMetrica()
-		//if err != nil {
-		//	constants.Logger.ErrorLog(err)
-		//	return err
-		//}
-		//if _, err := rw.Write(metricsJSON); err != nil {
-		//	constants.Logger.ErrorLog(err)
-		//	return err
-		//}
 		arrMetrics = append(arrMetrics, mt)
 	}
 
-	for _, val := range cfg.TypeMetricsStorage {
+	for _, val := range cfg.StorageType {
 		val.WriteMetric(arrMetrics)
 	}
 
@@ -393,7 +384,7 @@ func (rs *RepStore[T]) HandlerPingDB(h Header) error {
 
 	cfg := rs.getConfigRepStore()
 
-	mapTypeStore := cfg.TypeMetricsStorage
+	mapTypeStore := cfg.StorageType
 	if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
 		constants.Logger.ErrorLog(errors.New("соединение с базой отсутствует"))
 		return errs.ErrStatusInternalServer
@@ -426,8 +417,8 @@ func (rs *RepStore[T]) Updates(msg []byte) error {
 		return err
 	}
 
-	typeMetricsStorage := rs.getConfigRepStore().TypeMetricsStorage
-	for _, val := range typeMetricsStorage {
+	storageType := rs.getConfigRepStore().StorageType
+	for _, val := range storageType {
 		val.WriteMetric(storedData)
 	}
 

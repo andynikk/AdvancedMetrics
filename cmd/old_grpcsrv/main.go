@@ -17,7 +17,7 @@ import (
 )
 
 type server struct {
-	storege grpchandlers.RepStore
+	storage grpchandlers.RepStore
 }
 
 var buildVersion = "N/A"
@@ -31,13 +31,13 @@ func main() {
 	fmt.Println(fmt.Sprintf("Build commit: %s", buildCommit))
 
 	server := new(server)
-	grpchandlers.NewRepStore(&server.storege)
-	fmt.Println(server.storege.Config.Address)
+	grpchandlers.NewRepStore(&server.storage)
+	fmt.Println(server.storage.Config.Address)
 
 	gRepStore := general.New[grpchandlers.RepStore]()
-	gRepStore.Set(constants.TypeSrvGRPC.String(), server.storege)
+	gRepStore.Set(constants.TypeSrvGRPC.String(), server.storage)
 
-	if server.storege.Config.Restore {
+	if server.storage.Config.Restore {
 		go gRepStore.RestoreData()
 	}
 
@@ -45,9 +45,10 @@ func main() {
 
 	s := grpc.NewServer(middlware.WithServerUnaryInterceptor())
 	srv := &api.GRPCServer{
-		gRepStore,
+		RepStore: gRepStore,
 	}
-	api.RegisterUpdatersServer(s, srv)
+
+	api.RegisterMetricCollectorServer(s, srv)
 	l, err := net.Listen("tcp", constants.AddressServer)
 	if err != nil {
 		log.Fatal(err)

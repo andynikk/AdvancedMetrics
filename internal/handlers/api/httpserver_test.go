@@ -85,28 +85,28 @@ func ExampleRepStore_HandlerGetValue() {
 
 func init() {
 
-	storege := handlers.RepStore{}
+	storage := handlers.RepStore{}
 
 	// NewRepStore инициализация хранилища, роутера, заполнение настроек.
 
 	smm := new(repository.SyncMapMetrics)
 	smm.MutexRepo = make(repository.MutexRepo)
-	storege.SyncMapMetrics = smm
+	storage.SyncMapMetrics = smm
 
 	sc := environment.ServerConfig{}
 	sc.InitConfigServerENV()
 	sc.InitConfigServerFile()
 	sc.InitConfigServerDefault()
 
-	storege.Config = &sc
+	storage.Config = &sc
 
-	storege.PK, _ = encryption.InitPrivateKey(storege.Config.CryptoKey)
+	storage.PK, _ = encryption.InitPrivateKey(storage.Config.CryptoKey)
 
-	storege.Config.TypeMetricsStorage, _ = repository.InitStoreDB(storege.Config.TypeMetricsStorage, storege.Config.DatabaseDsn)
-	storege.Config.TypeMetricsStorage, _ = repository.InitStoreFile(storege.Config.TypeMetricsStorage, storege.Config.StoreFile)
+	storage.Config.StorageType, _ = repository.InitStoreDB(storage.Config.StorageType, storage.Config.DatabaseDsn)
+	storage.Config.StorageType, _ = repository.InitStoreFile(storage.Config.StorageType, storage.Config.StoreFile)
 
 	gRepStore := general.New[handlers.RepStore]()
-	gRepStore.Set(constants.TypeSrvHTTP.String(), storege)
+	gRepStore.Set(constants.TypeSrvHTTP.String(), storage)
 
 	srv.RepStore = gRepStore
 

@@ -15,40 +15,41 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
 	"github.com/andynikk/advancedmetrics/internal/encryption"
-	"github.com/andynikk/advancedmetrics/internal/general"
+	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/handlers"
 	"github.com/andynikk/advancedmetrics/internal/handlers/api"
 	"github.com/andynikk/advancedmetrics/internal/repository"
 	"github.com/gorilla/mux"
 )
 
-func TestFuncServer(t *testing.T) {
+func TestFuncServerHTTP(t *testing.T) {
 	var fValue float64 = 0.001
 	var iDelta int64 = 10
 
-	server := new(server)
+	config := environment.InitConfigServer()
+	server := NewServer(config).(*serverHTTP)
+
 	t.Run("Checking init server", func(t *testing.T) {
 		//rp.Config = environment.InitConfigServer()
-		api.NewRepStore(&server.storege)
-		if server.storege.Config.Address == "" {
+		if server.storage.Config.Address == "" {
 			t.Errorf("Error checking init server")
 		}
 	})
-	fmt.Println(server.storege.Config.Address)
+	fmt.Println(server.storage.Config.Address)
 
-	gRepStore := general.New[handlers.RepStore]()
-	gRepStore.Set(constants.TypeSrvHTTP.String(), server.storege)
+	//gRepStore := general.New[handlers.RepStore]()
+	//gRepStore.Set(constants.TypeSrvHTTP.String(), server.storage)
 
-	srv := api.HTTPServer{
-		RepStore: gRepStore,
-	}
+	//srv := api.HTTPServer{
+	//	RepStore: gRepStore,
+	//}
 
-	rp := srv.RepStore.Get(constants.TypeSrvHTTP.String())
+	rp := server.srv.RepStore.Get(constants.TypeSrvHTTP.String())
 	rp.MutexRepo = make(repository.MutexRepo)
 
 	t.Run("Checking init router", func(t *testing.T) {
-		api.InitRoutersMux(&srv)
-		if srv.Router == nil {
+		api.InitRoutersMux(&server.srv)
+		if server.srv.Router == nil {
 			t.Errorf("Error checking init router")
 		}
 	})
@@ -99,13 +100,13 @@ func TestFuncServer(t *testing.T) {
 
 	t.Run("Checking connect DB", func(t *testing.T) {
 		t.Run("Checking create DB table", func(t *testing.T) {
-			typeMetricsStorage, err := repository.InitStoreDB(rp.Config.TypeMetricsStorage, rp.Config.DatabaseDsn)
+			storageType, err := repository.InitStoreDB(rp.Config.StorageType, rp.Config.DatabaseDsn)
 			if err != nil {
 				t.Errorf(fmt.Sprintf("Error create DB table: %s", err.Error()))
 			}
-			rp.Config.TypeMetricsStorage = typeMetricsStorage
+			rp.Config.StorageType = storageType
 			t.Run("Checking handlers /ping GET", func(t *testing.T) {
-				mapTypeStore := rp.Config.TypeMetricsStorage
+				mapTypeStore := rp.Config.StorageType
 				if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
 					t.Errorf("Error handlers /ping GET")
 				}
@@ -220,28 +221,28 @@ func TestFuncServer(t *testing.T) {
 			}
 		})
 
-		t.Run(`Checking method PrepareDataBU`, func(t *testing.T) {
+		t.Run(`Checking method PrepareDataForBackup`, func(t *testing.T) {
 			valG := repository.Gauge(0)
 			if ok := valG.SetFromText("0.001"); !ok {
-				t.Errorf(`Error method "PrepareDataBU"`)
+				t.Errorf(`Error method "PrepareDataForBackup"`)
 			}
 			rp.MutexRepo["TestGauge"] = &valG
 
 			valC := repository.Counter(0)
 			if ok := valC.SetFromText("58"); !ok {
-				t.Errorf(`Error method "PrepareDataBU"`)
+				t.Errorf(`Error method "PrepareDataForBackup"`)
 			}
 			rp.MutexRepo["TestCounter"] = &valC
 
-			data := srv.RepStore.PrepareDataBU()
+			data := server.srv.RepStore.PrepareDataForBackup()
 			if len(data) != 2 {
-				t.Errorf(`Error method "PrepareDataBU"`)
+				t.Errorf(`Error method "PrepareDataForBackup"`)
 			}
 		})
 	})
 
 	t.Run("Checking handlers", func(t *testing.T) {
-		ts := httptest.NewServer(srv.Router)
+		ts := httptest.NewServer(server.srv.Router)
 		defer ts.Close()
 
 		t.Run("Checking handler /update/{metType}/{metName}/{metValue}/", func(t *testing.T) {
@@ -281,7 +282,7 @@ func TestFuncServer(t *testing.T) {
 				t.Errorf("Error handler /update POST/")
 			}
 			t.Run("Checking handler /value POST/", func(t *testing.T) {
-				metricJSON, err := json.MarshalIndent(testMericGouge(""), "", " ")
+				metricJSON, err := json.MarshalIndent(testMericGougeHTTP(""), "", " ")
 				if err != nil {
 					t.Errorf("Error handler /value POST/")
 				}
@@ -333,9 +334,9 @@ func TestFuncServer(t *testing.T) {
 				smm.MutexRepo = make(repository.MutexRepo)
 				rp.SyncMapMetrics = smm
 
-				srv.Router = nil
+				server.srv.Router = nil
 
-				r.HandleFunc("/update/{metType}/{metName}/{metValue}", srv.HandlerSetMetricaPOST).Methods("POST")
+				r.HandleFunc("/update/{metType}/{metName}/{metValue}", server.srv.HandlerSetMetricaPOST).Methods("POST")
 
 				defer ts.Close()
 				resp := testRequest(t, ts, http.MethodPost, tt.request, nil)
@@ -467,13 +468,13 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, body io
 func testArray(configKey string) encoding.ArrMetrics {
 	var arrM encoding.ArrMetrics
 
-	arrM = append(arrM, testMericGouge(configKey))
-	arrM = append(arrM, testMericCaunter(configKey))
+	arrM = append(arrM, testMericGougeHTTP(configKey))
+	arrM = append(arrM, testMericCaunterHTTP(configKey))
 
 	return arrM
 }
 
-func testMericGouge(configKey string) encoding.Metrics {
+func testMericGougeHTTP(configKey string) encoding.Metrics {
 
 	var fValue float64 = 0.001
 
@@ -486,7 +487,7 @@ func testMericGouge(configKey string) encoding.Metrics {
 	return mGauge
 }
 
-func testMericCaunter(configKey string) encoding.Metrics {
+func testMericCaunterHTTP(configKey string) encoding.Metrics {
 	var iDelta int64 = 10
 
 	var mCounter encoding.Metrics

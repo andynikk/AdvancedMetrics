@@ -4,16 +4,16 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/logger"
 )
 
-type TypeMetricsStorage int
-type TypeSrv int
+type StorageType int
+type TypeServer int
 
 const (
-	TypeSrvGRPC TypeSrv = iota
+	TypeSrvGRPC TypeServer = iota
 	TypeSrvHTTP
 )
 
 const (
-	MetricsStorageDB TypeMetricsStorage = iota
+	MetricsStorageDB StorageType = iota
 	MetricsStorageFile
 
 	TimeLivingCertificateYaer   = 10
@@ -81,11 +81,11 @@ const (
 	SepIPAddress = ";"
 )
 
-func (tmc TypeMetricsStorage) String() string {
-	return [...]string{"db", "file"}[tmc]
+func (st StorageType) String() string {
+	return [...]string{"db", "file"}[st]
 }
 
-func (ts TypeSrv) String() string {
+func (ts TypeServer) String() string {
 	return [...]string{"gRPC", "HTTP"}[ts]
 }
 

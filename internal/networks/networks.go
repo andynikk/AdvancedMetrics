@@ -24,7 +24,7 @@ func AddressAllowed(IPs []string) bool {
 	return false
 }
 
-func IPStr(IPs []net.IP) string {
+func IPv4RangesToStr(IPs []net.IP) string {
 
 	strIP := ""
 	for _, ip := range IPs {

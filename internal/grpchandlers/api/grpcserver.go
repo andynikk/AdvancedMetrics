@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/andynikk/advancedmetrics/internal/constants/errs"
 	"github.com/andynikk/advancedmetrics/internal/general"
 	"github.com/andynikk/advancedmetrics/internal/grpchandlers"
 	"google.golang.org/grpc/metadata"
@@ -14,7 +13,7 @@ type GRPCServer struct {
 	RepStore general.RepStore[grpchandlers.RepStore]
 }
 
-func Header(ctx context.Context) general.Header {
+func FillHeader(ctx context.Context) general.Header {
 	mHeader := make(general.Header)
 
 	mdI, _ := metadata.FromIncomingContext(ctx)
@@ -34,51 +33,53 @@ func Header(ctx context.Context) general.Header {
 	return mHeader
 }
 
-func (s *GRPCServer) mustEmbedUnimplementedUpdatersServer() {
+func (s *GRPCServer) mustEmbedUnimplementedMetricCollectorServer() {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (s *GRPCServer) UpdatesJSON(ctx context.Context, req *UpdatesRequest) (*BoolRespons, error) {
-	header := Header(ctx)
+func (s *GRPCServer) UpdatesAllMetricsJSON(ctx context.Context, req *UpdatesRequest) (*TextErrResponse, error) {
+	header := FillHeader(ctx)
 
 	err := s.RepStore.HandlerUpdatesMetricJSON(header, req.Body)
 	if err != nil {
-		return &BoolRespons{Result: false}, nil
+		return &TextErrResponse{Result: []byte(err.Error())}, err
 	}
-	return &BoolRespons{Result: true}, nil
+	return &TextErrResponse{Result: []byte("")}, nil
 }
 
-func (s *GRPCServer) UpdateJSON(ctx context.Context, req *UpdateStrRequest) (*BoolRespons, error) {
-	header := Header(ctx)
+func (s *GRPCServer) UpdateOneMetricsJSON(ctx context.Context, req *UpdateStrRequest) (*TextErrResponse, error) {
+	header := FillHeader(ctx)
 
 	err := s.RepStore.HandlerUpdateMetricJSON(header, req.Body)
 	if err != nil {
-		return &BoolRespons{Result: false}, err
+		return &TextErrResponse{Result: []byte(err.Error())}, err
 	}
-	return &BoolRespons{Result: true}, nil
+	return &TextErrResponse{Result: []byte("")}, nil
 }
 
-func (s *GRPCServer) Update(ctx context.Context, req *UpdateRequest) (*BoolRespons, error) {
+func (s *GRPCServer) UpdateOneMetrics(ctx context.Context, req *UpdateRequest) (*TextErrResponse, error) {
 	err := s.RepStore.HandlerSetMetricaPOST(string(req.MetType), string(req.MetName), string(req.MetValue))
+
 	if err != nil {
-		return &BoolRespons{Result: false}, err
+		return &TextErrResponse{Result: []byte(err.Error())}, err
 	}
-	return &BoolRespons{Result: true}, nil
+
+	return &TextErrResponse{Result: []byte("")}, nil
 }
 
-func (s *GRPCServer) Ping(ctx context.Context, req *EmtyRequest) (*BoolRespons, error) {
-	header := Header(ctx)
+func (s *GRPCServer) PingDataBases(ctx context.Context, req *EmptyRequest) (*TextErrResponse, error) {
+	header := FillHeader(ctx)
 
 	err := s.RepStore.HandlerPingDB(header)
 	if err != nil {
-		return &BoolRespons{Result: false}, nil
+		return &TextErrResponse{Result: []byte(err.Error())}, err
 	}
-	return &BoolRespons{Result: true}, nil
+	return &TextErrResponse{Result: []byte("")}, nil
 }
 
-func (s *GRPCServer) ValueJSON(ctx context.Context, req *UpdatesRequest) (*FullRespons, error) {
-	header := Header(ctx)
+func (s *GRPCServer) GetValueJSON(ctx context.Context, req *UpdatesRequest) (*FullResponse, error) {
+	header := FillHeader(ctx)
 
 	h, body, err := s.RepStore.HandlerValueMetricaJSON(header, req.Body)
 	ok := true
@@ -91,16 +92,16 @@ func (s *GRPCServer) ValueJSON(ctx context.Context, req *UpdatesRequest) (*FullR
 		hdr += fmt.Sprintf("%s:%s\n", k, v)
 	}
 
-	return &FullRespons{Header: []byte(hdr), Body: body, Result: ok}, err
+	return &FullResponse{Header: []byte(hdr), Body: body, Result: ok}, err
 }
 
-func (s *GRPCServer) Value(ctx context.Context, req *UpdatesRequest) (*StatusRespons, error) {
+func (s *GRPCServer) GetValue(ctx context.Context, req *UpdatesRequest) (*StatusResponse, error) {
 	val, err := s.RepStore.HandlerGetValue(req.Body)
-	return &StatusRespons{Result: []byte(val), Status: errs.StatusError(err)}, err
+	return &StatusResponse{Result: []byte(val)}, err
 }
 
-func (s *GRPCServer) ListMetrics(ctx context.Context, req *EmtyRequest) (*StatusRespons, error) {
-	header := Header(ctx)
+func (s *GRPCServer) GetListMetrics(ctx context.Context, req *EmptyRequest) (*StatusResponse, error) {
+	header := FillHeader(ctx)
 	_, val := s.RepStore.HandlerGetAllMetrics(header)
-	return &StatusRespons{Result: val, Status: 200}, nil
+	return &StatusResponse{Result: val}, nil
 }

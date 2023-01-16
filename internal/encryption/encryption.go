@@ -24,19 +24,19 @@ type KeyEncryption struct {
 	PrivateKey     *rsa.PrivateKey
 }
 
-func (ke *KeyEncryption) RsaEncrypt(msg []byte) ([]byte, error) {
-	if ke == nil {
+func (key *KeyEncryption) RsaEncrypt(msg []byte) ([]byte, error) {
+	if key == nil {
 		return msg, nil
 	}
-	encryptedBytes, err := rsa.EncryptOAEP(sha512.New512_256(), rand.Reader, ke.PublicKey, msg, nil)
+	encryptedBytes, err := rsa.EncryptOAEP(sha512.New512_256(), rand.Reader, key.PublicKey, msg, nil)
 	return encryptedBytes, err
 }
 
-func (ke *KeyEncryption) RsaDecrypt(msgByte []byte) ([]byte, error) {
-	if ke == nil {
+func (key *KeyEncryption) RsaDecrypt(msgByte []byte) ([]byte, error) {
+	if key == nil {
 		return msgByte, nil
 	}
-	decryptedBytes, err := ke.PrivateKey.Decrypt(nil, msgByte, &rsa.OAEPOptions{Hash: crypto.SHA512_256})
+	decryptedBytes, err := key.PrivateKey.Decrypt(nil, msgByte, &rsa.OAEPOptions{Hash: crypto.SHA512_256})
 	return decryptedBytes, err
 }
 

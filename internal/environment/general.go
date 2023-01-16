@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func ThisOSWindows() bool {
+func isOSWindows() bool {
 
 	var stderr bytes.Buffer
 	defer stderr.Reset()
@@ -29,7 +29,7 @@ func ThisOSWindows() bool {
 	return false
 }
 
-func ParsCfgByte(res []byte) bytes.Buffer {
+func ParseConfigBytes(res []byte) bytes.Buffer {
 
 	var out bytes.Buffer
 	configLines := strings.Split(string(res), "\n")

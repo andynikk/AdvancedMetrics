@@ -21,18 +21,18 @@ type AgentConfigENV struct {
 	Key            string        `env:"KEY"`
 	CryptoKey      string        `env:"CRYPTO_KEY"`
 	Config         string        `env:"CONFIG"`
-	TypeSrv        string        `env:"TYPE_SRV"`
+	TypeServer     string        `env:"TYPE_SRV"`
 }
 
 type AgentConfig struct {
-	Address        string
-	ReportInterval time.Duration
-	PollInterval   time.Duration
-	Key            string
-	CryptoKey      string
-	ConfigFilePath string
-	IPAddress      string
-	TypeSrv        string
+	Address          string
+	ReportInterval   time.Duration
+	PollInterval     time.Duration
+	Key              string
+	CryptoKey        string
+	ConfigFilePath   string
+	IPAddress        string
+	StringTypeServer string
 }
 
 type AgentConfigFile struct {
@@ -50,13 +50,13 @@ func GetAgentConfigFile(file *string) AgentConfigFile {
 		return sConfig
 	}
 
-	out := ParsCfgByte(res)
+	out := ParseConfigBytes(res)
 	defer out.Reset()
 
 	if err = json.Unmarshal([]byte(out.String()), &sConfig); err != nil {
 		return sConfig
 	}
-	if ThisOSWindows() {
+	if isOSWindows() {
 		sConfig.CryptoKey = strings.Replace(sConfig.CryptoKey, "/", "\\", -1)
 	}
 
@@ -114,7 +114,7 @@ func (ac *AgentConfig) InitConfigAgentENV() {
 
 	typeSrv := ""
 	if _, ok := os.LookupEnv("TYPE_SRV"); ok {
-		typeSrv = cfgENV.TypeSrv
+		typeSrv = cfgENV.TypeServer
 	}
 
 	ac.Address = addressServ
@@ -123,7 +123,8 @@ func (ac *AgentConfig) InitConfigAgentENV() {
 	ac.Key = keyHash
 	ac.CryptoKey = patchCryptoKey
 	ac.ConfigFilePath = pathFileCfg
-	ac.TypeSrv = typeSrv
+
+	ac.StringTypeServer = typeSrv
 }
 
 func (ac *AgentConfig) InitConfigAgentFlag() {
@@ -213,11 +214,11 @@ func (ac *AgentConfig) InitConfigAgentDefault() {
 	if ac.PollInterval == 0 {
 		ac.PollInterval = pollIntervalMetrics
 	}
-	if ac.TypeSrv == "" {
-		ac.TypeSrv = typeSrv
+	if ac.StringTypeServer == "" {
+		ac.StringTypeServer = typeSrv
 	}
 
 	hn, _ := os.Hostname()
 	IPs, _ := net.LookupIP(hn)
-	ac.IPAddress = networks.IPStr(IPs)
+	ac.IPAddress = networks.IPv4RangesToStr(IPs)
 }

@@ -23,11 +23,11 @@ func NewRepStore(rs *RepStore) {
 	InitRoutersMux(rs)
 
 	//rs.Config = environment.InitConfigGRPC()
-	rs.Config = environment.InitConfigServer()
-	rs.PK, _ = encryption.InitPrivateKey(rs.Config.CryptoKey)
-
-	rs.Config.TypeMetricsStorage, _ = repository.InitStoreDB(rs.Config.TypeMetricsStorage, rs.Config.DatabaseDsn)
-	rs.Config.TypeMetricsStorage, _ = repository.InitStoreFile(rs.Config.TypeMetricsStorage, rs.Config.StoreFile)
+	//rs.Config = environment.InitConfigServer()
+	//rs.PK, _ = encryption.InitPrivateKey(rs.Config.CryptoKey)
+	//
+	//rs.Config.StorageType, _ = repository.InitStoreDB(rs.Config.StorageType, rs.Config.DatabaseDsn)
+	//rs.Config.StorageType, _ = repository.InitStoreFile(rs.Config.StorageType, rs.Config.StoreFile)
 }
 
 // InitRoutersMux создание роутера.

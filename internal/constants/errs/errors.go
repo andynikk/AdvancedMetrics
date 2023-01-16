@@ -2,7 +2,20 @@ package errs
 
 import (
 	"errors"
+	"net/http"
+
+	"google.golang.org/grpc/codes"
 )
+
+type TypeError int
+
+type ErrorHTTP struct {
+	Error error
+}
+
+type ErrorGRPC struct {
+	Error error
+}
 
 var ErrStatusInternalServer = errors.New("status internal server error")
 var ErrSendMsgGPRC = errors.New("send msg to GPRC error")
@@ -14,27 +27,57 @@ var ErrBadRequest = errors.New("bad request")
 var ErrNotImplemented = errors.New("not implemented")
 var ErrIPAddressAllowed = errors.New("not IP address allowed")
 
-func StatusError(err error) int32 {
-	switch err {
+func StatusHTTP(e error) int {
+	switch e {
+	case nil:
+		return http.StatusOK
 	case ErrStatusInternalServer:
-		return 500
+		return http.StatusInternalServerError
 	case ErrSendMsgGPRC:
-		return 500
+		return http.StatusInternalServerError
 	case ErrDecrypt:
-		return 500
+		return http.StatusInternalServerError
 	case ErrDecompress:
-		return 500
+		return http.StatusInternalServerError
 	case ErrGetJSON:
-		return 500
+		return http.StatusInternalServerError
 	case ErrIPAddressAllowed:
-		return 500
+		return http.StatusInternalServerError
 	case ErrNotFound:
-		return 404
+		return http.StatusNotFound
 	case ErrBadRequest:
-		return 400
+		return http.StatusBadRequest
 	case ErrNotImplemented:
-		return 501
+		return http.StatusNotImplemented
 	default:
-		return 200
+		return http.StatusInternalServerError
+	}
+}
+
+func CodeGRPC(e error) codes.Code {
+	switch e {
+	case nil:
+		return codes.OK
+	case ErrStatusInternalServer:
+		return codes.Internal
+	case ErrSendMsgGPRC:
+		return codes.Internal
+	case ErrDecrypt:
+		return codes.Internal
+	case ErrDecompress:
+		return codes.Internal
+	case ErrGetJSON:
+		return codes.Internal
+	case ErrIPAddressAllowed:
+		return codes.Internal
+	case ErrNotFound:
+		return codes.NotFound
+	case ErrBadRequest:
+		return codes.PermissionDenied
+	case ErrNotImplemented:
+		return codes.Unimplemented
+	default:
+		return codes.Internal
+
 	}
 }

@@ -78,11 +78,11 @@ func NewRepStore(rs *handlers.RepStore) {
 
 	//InitRoutersMux(rs)
 
-	rs.Config = environment.InitConfigServer()
-	rs.PK, _ = encryption.InitPrivateKey(rs.Config.CryptoKey)
+	//rs.Config = environment.InitConfigServer()
+	//rs.PK, _ = encryption.InitPrivateKey(rs.Config.CryptoKey)
 
-	rs.Config.TypeMetricsStorage, _ = repository.InitStoreDB(rs.Config.TypeMetricsStorage, rs.Config.DatabaseDsn)
-	rs.Config.TypeMetricsStorage, _ = repository.InitStoreFile(rs.Config.TypeMetricsStorage, rs.Config.StoreFile)
+	//rs.Config.StorageType, _ = repository.InitStoreDB(rs.Config.StorageType, rs.Config.DatabaseDsn)
+	//rs.Config.StorageType, _ = repository.InitStoreFile(rs.Config.StorageType, rs.Config.StoreFile)
 }
 
 func FillHeader(h http.Header) general.Header {
@@ -207,7 +207,7 @@ func (s *HTTPServer) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Re
 
 	h, b, err := s.RepStore.HandlerValueMetricaJSON(h, bytBody)
 	if err != nil {
-		http.Error(rw, err.Error(), int(errs.StatusError(err)))
+		http.Error(rw, err.Error(), errs.StatusHTTP(err))
 		return
 	}
 
@@ -227,5 +227,5 @@ func (s *HTTPServer) HandlerSetMetricaPOST(rw http.ResponseWriter, rq *http.Requ
 	metValue := mux.Vars(rq)["metValue"]
 
 	err := s.RepStore.HandlerSetMetricaPOST(metType, metName, metValue)
-	rw.WriteHeader(int(errs.StatusError(err)))
+	rw.WriteHeader(errs.StatusHTTP(err))
 }

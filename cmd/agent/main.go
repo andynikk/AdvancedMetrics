@@ -16,6 +16,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
+
 	"github.com/andynikk/advancedmetrics/internal/compression"
 	"github.com/andynikk/advancedmetrics/internal/constants"
 	"github.com/andynikk/advancedmetrics/internal/constants/errs"
@@ -25,16 +31,11 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/grpchandlers/api"
 	"github.com/andynikk/advancedmetrics/internal/repository"
-	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/mem"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 )
 
 type MetricsGauge map[string]repository.Gauge
-type emtyArrMetrics []encoding.Metrics
-type MapMetricsButch map[int]emtyArrMetrics
+type emptyArrMetrics []encoding.Metrics
+type MapMetricsButch map[int]emptyArrMetrics
 
 type data struct {
 	sync.RWMutex
@@ -42,8 +43,15 @@ type data struct {
 	metricsGauge MetricsGauge
 }
 
+type ServerHTTP bool
+type ServerGRPC bool
+
+type ServerType interface {
+	Post2Server(agent *agent, allMetrics []byte) error
+}
+
 type agent struct {
-	cfg            *environment.AgentConfig
+	config         *environment.AgentConfig
 	KeyEncryption  *encryption.KeyEncryption
 	GRPCClientConn *grpc.ClientConn
 	data
@@ -53,7 +61,7 @@ var buildVersion = "N/A"
 var buildDate = "N/A"
 var buildCommit = "N/A"
 
-func (eam *emtyArrMetrics) prepareMetrics(key *encryption.KeyEncryption) ([]byte, error) {
+func (eam *emptyArrMetrics) prepareMetrics(key *encryption.KeyEncryption) ([]byte, error) {
 	arrMetrics, err := json.MarshalIndent(eam, "", " ")
 	if err != nil {
 		return nil, err
@@ -139,7 +147,7 @@ func (a *agent) metrixOtherScan() {
 
 func (a *agent) goMetrixOtherScan(ctx context.Context, cancelFunc context.CancelFunc) {
 
-	saveTicker := time.NewTicker(a.cfg.PollInterval)
+	saveTicker := time.NewTicker(a.config.PollInterval)
 	for {
 		select {
 		case <-saveTicker.C:
@@ -155,7 +163,7 @@ func (a *agent) goMetrixOtherScan(ctx context.Context, cancelFunc context.Cancel
 
 func (a *agent) goMetrixScan(ctx context.Context, cancelFunc context.CancelFunc) {
 
-	saveTicker := time.NewTicker(a.cfg.PollInterval)
+	saveTicker := time.NewTicker(a.config.PollInterval)
 	for {
 		select {
 		case <-saveTicker.C:
@@ -169,83 +177,19 @@ func (a *agent) goMetrixScan(ctx context.Context, cancelFunc context.CancelFunc)
 	}
 }
 
-func (a *agent) Post2Server(allMterics []byte) error {
+func (a *agent) goPost2Server(metricsButch MapMetricsButch) error {
 
-	addressPost := fmt.Sprintf("http://%s/updates", a.cfg.Address)
+	for _, allMetrics := range metricsButch {
 
-	req, err := http.NewRequest("POST", addressPost, bytes.NewReader(allMterics))
-	if err != nil {
-
-		constants.Logger.ErrorLog(err)
-
-		return errors.New("-- ошибка отправки данных на сервер (1)")
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
-	req.Header.Set("X-Real-IP", a.cfg.IPAddress)
-	if a.KeyEncryption != nil && a.KeyEncryption.PublicKey != nil {
-		req.Header.Set("Content-Encryption", a.KeyEncryption.TypeEncryption)
-	}
-
-	defer req.Body.Close()
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		constants.Logger.ErrorLog(err)
-		return errors.New("-- ошибка отправки данных на сервер (2)")
-	}
-	defer resp.Body.Close()
-
-	return nil
-}
-
-func (a *agent) Post2gRPSServer(allMterics []byte) error {
-
-	c := api.NewUpdatersClient(a.GRPCClientConn)
-	mHeader := map[string]string{"Content-Type": "application/json",
-		"Content-Encoding": "gzip",
-		"X-Real-IP":        a.cfg.IPAddress}
-	if a.KeyEncryption != nil && a.KeyEncryption.PublicKey != nil {
-		mHeader["Content-Encryption"] = a.KeyEncryption.TypeEncryption
-	}
-
-	md := metadata.New(mHeader)
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
-	res, err := c.UpdatesJSON(ctx, &api.UpdatesRequest{Body: allMterics})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ok := res.GetResult()
-	if !ok {
-		return errs.ErrSendMsgGPRC
-	}
-
-	return nil
-}
-
-func (a *agent) goPost2Server(matricsButch MapMetricsButch) error {
-
-	for _, allMetrics := range matricsButch {
-
-		gziparrMetrics, err := allMetrics.prepareMetrics(a.KeyEncryption)
+		gzipArrMetrics, err := allMetrics.prepareMetrics(a.KeyEncryption)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return err
 		}
 
-		switch a.cfg.TypeSrv {
-		case constants.TypeSrvGRPC.String():
-			if err = a.Post2gRPSServer(gziparrMetrics); err != nil {
-				constants.Logger.ErrorLog(err)
-				return err
-			}
-		default:
-			if err = a.Post2Server(gziparrMetrics); err != nil {
-				constants.Logger.ErrorLog(err)
-				return err
-			}
+		if err = GetTypeSrv(a.config.StringTypeServer).Post2Server(a, gzipArrMetrics); err != nil {
+			constants.Logger.ErrorLog(err)
+			return err
 		}
 	}
 
@@ -258,7 +202,7 @@ func (a *agent) SendMetricsServer() (MapMetricsButch, error) {
 
 	mapMatricsButch := MapMetricsButch{}
 
-	allMetrics := make(emtyArrMetrics, 0)
+	allMetrics := make(emptyArrMetrics, 0)
 	i := 0
 	sch := 0
 	tempMetricsGauge := &a.data.metricsGauge
@@ -266,19 +210,16 @@ func (a *agent) SendMetricsServer() (MapMetricsButch, error) {
 		valFloat64 := float64(val)
 
 		msg := fmt.Sprintf("%s:gauge:%f", key, valFloat64)
-		heshVal := cryptohash.HeshSHA256(msg, a.cfg.Key)
+		heshVal := cryptohash.HeshSHA256(msg, a.config.Key)
 
 		metrica := encoding.Metrics{ID: key, MType: val.Type(), Value: &valFloat64, Hash: heshVal}
 		allMetrics = append(allMetrics, metrica)
 
 		i++
 		if i == constants.ButchSize {
-			//if err := a.goPost2Server(allMetrics); err != nil {
-			//	return nil, err
-			//}
 
 			mapMatricsButch[sch] = allMetrics
-			allMetrics = make(emtyArrMetrics, 0)
+			allMetrics = make(emptyArrMetrics, 0)
 			sch++
 			i = 0
 		}
@@ -286,7 +227,7 @@ func (a *agent) SendMetricsServer() (MapMetricsButch, error) {
 
 	cPollCount := repository.Counter(a.data.pollCount)
 	msg := fmt.Sprintf("%s:counter:%d", "PollCount", a.data.pollCount)
-	heshVal := cryptohash.HeshSHA256(msg, a.cfg.Key)
+	heshVal := cryptohash.HeshSHA256(msg, a.config.Key)
 
 	metrica := encoding.Metrics{ID: "PollCount", MType: cPollCount.Type(), Delta: &a.data.pollCount, Hash: heshVal}
 	allMetrics = append(allMetrics, metrica)
@@ -298,7 +239,7 @@ func (a *agent) SendMetricsServer() (MapMetricsButch, error) {
 
 func (a *agent) goMakeRequest(ctx context.Context, cancelFunc context.CancelFunc) {
 
-	reportTicker := time.NewTicker(a.cfg.ReportInterval)
+	reportTicker := time.NewTicker(a.config.ReportInterval)
 
 	for {
 		select {
@@ -315,6 +256,71 @@ func (a *agent) goMakeRequest(ctx context.Context, cancelFunc context.CancelFunc
 	}
 }
 
+func (s *ServerHTTP) Post2Server(agent *agent, allMetrics []byte) error {
+
+	addressPost := fmt.Sprintf("http://%s/updates", agent.config.Address)
+
+	req, err := http.NewRequest("POST", addressPost, bytes.NewReader(allMetrics))
+	if err != nil {
+
+		constants.Logger.ErrorLog(err)
+
+		return errors.New("-- ошибка отправки данных на сервер (1)")
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("X-Real-IP", agent.config.IPAddress)
+	if agent.KeyEncryption != nil && agent.KeyEncryption.PublicKey != nil {
+		req.Header.Set("Content-Encryption", agent.KeyEncryption.TypeEncryption)
+	}
+
+	defer req.Body.Close()
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		constants.Logger.ErrorLog(err)
+		return errors.New("-- ошибка отправки данных на сервер (2)")
+	}
+	defer resp.Body.Close()
+
+	return nil
+}
+
+func (s *ServerGRPC) Post2Server(agent *agent, allMetrics []byte) error {
+
+	c := api.NewMetricCollectorClient(agent.GRPCClientConn)
+	mHeader := map[string]string{"Content-Type": "application/json",
+		"Content-Encoding": "gzip",
+		"X-Real-IP":        agent.config.IPAddress}
+	if agent.KeyEncryption != nil && agent.KeyEncryption.PublicKey != nil {
+		mHeader["Content-Encryption"] = agent.KeyEncryption.TypeEncryption
+	}
+
+	md := metadata.New(mHeader)
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	res, err := c.UpdatesAllMetricsJSON(ctx, &api.UpdatesRequest{Body: allMetrics})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	textErr := string(res.GetResult())
+	if textErr != "" {
+		constants.Logger.ErrorLog(errors.New(textErr))
+		return errs.ErrSendMsgGPRC
+	}
+
+	return nil
+}
+
+func GetTypeSrv(stringTypeServer string) ServerType {
+	if stringTypeServer == constants.TypeSrvGRPC.String() {
+		return new(ServerGRPC)
+	}
+
+	return new(ServerHTTP)
+}
+
 func main() {
 
 	fmt.Println(fmt.Sprintf("Build version: %s", buildVersion))
@@ -325,14 +331,15 @@ func main() {
 	certPublicKey, _ := encryption.InitPublicKey(configAgent.CryptoKey)
 
 	a := agent{
-		cfg: configAgent,
+		config: configAgent,
 		data: data{
 			pollCount:    0,
 			metricsGauge: make(MetricsGauge),
 		},
 		KeyEncryption: certPublicKey,
 	}
-	if a.cfg.TypeSrv == constants.TypeSrvGRPC.String() {
+
+	if a.config.StringTypeServer == constants.TypeSrvGRPC.String() {
 		conn, _ := grpc.Dial(constants.AddressServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		a.GRPCClientConn = conn
 	}
