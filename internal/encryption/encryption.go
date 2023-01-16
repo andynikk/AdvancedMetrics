@@ -36,13 +36,13 @@ func (key *KeyEncryption) RsaDecrypt(msgByte []byte) ([]byte, error) {
 	if key == nil {
 		return msgByte, nil
 	}
-	decryptedBytes, err := key.PrivateKey.Decrypt(nil, msgByte, &rsa.OAEPOptions{Hash: crypto.SHA512_256})
-	return decryptedBytes, err
+	msgByte, err := key.PrivateKey.Decrypt(nil, msgByte, &rsa.OAEPOptions{Hash: crypto.SHA512_256})
+	return msgByte, err
 }
 
 func CreateCert() ([]bytes.Buffer, error) {
 	var numSert int64
-	var subjectKeyId string
+	var subjectKeyID string
 	var lenKeyByte int
 
 	fmt.Print("Введите уникальный номер сертификата: ")
@@ -52,7 +52,7 @@ func CreateCert() ([]bytes.Buffer, error) {
 	}
 
 	fmt.Print("Введите ИД ключа субъекта (пример ввода 12346): ")
-	if _, err := fmt.Fscan(os.Stdin, &subjectKeyId); err != nil {
+	if _, err := fmt.Fscan(os.Stdin, &subjectKeyID); err != nil {
 		constants.Logger.ErrorLog(err)
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func CreateCert() ([]bytes.Buffer, error) {
 		NotBefore: time.Now(),
 		NotAfter: time.Now().AddDate(constants.TimeLivingCertificateYaer, constants.TimeLivingCertificateMounth,
 			constants.TimeLivingCertificateDay),
-		SubjectKeyId: []byte(subjectKeyId),
+		SubjectKeyId: []byte(subjectKeyID),
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}

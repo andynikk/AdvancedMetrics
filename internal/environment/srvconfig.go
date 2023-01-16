@@ -63,7 +63,7 @@ func GetServerConfigFile(file *string) ServerConfigFile {
 	out := ParseConfigBytes(res)
 	defer out.Reset()
 
-	if err = json.Unmarshal([]byte(out.String()), &sConfig); err != nil {
+	if err = json.Unmarshal(out.Bytes(), &sConfig); err != nil {
 		return sConfig
 	}
 	if isOSWindows() {
@@ -249,8 +249,7 @@ func (sc *ServerConfig) InitConfigServerFile() {
 		return
 	}
 
-	var jsonCfg ServerConfigFile
-	jsonCfg = GetServerConfigFile(&sc.ConfigFilePath)
+	jsonCfg := GetServerConfigFile(&sc.ConfigFilePath)
 
 	addressServ := jsonCfg.Address
 	restoreMetric := jsonCfg.Restore

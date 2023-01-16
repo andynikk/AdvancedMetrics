@@ -23,10 +23,7 @@ func isOSWindows() bool {
 		return false
 	}
 	myOS := out.String()
-	if strings.Contains(myOS, "Microsoft Windows") {
-		return true
-	}
-	return false
+	return strings.Contains(myOS, "Microsoft Windows")
 }
 
 func ParseConfigBytes(res []byte) bytes.Buffer {

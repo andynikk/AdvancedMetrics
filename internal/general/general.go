@@ -115,9 +115,7 @@ func (rs *RepStore[T]) RestoreData() {
 			constants.Logger.ErrorLog(err)
 			continue
 		}
-		for _, valArr := range arrMetrics {
-			arrMetricsAll = append(arrMetricsAll, valArr)
-		}
+		arrMetricsAll = append(arrMetricsAll, arrMetrics...)
 	}
 
 	rs.SetValueInMapJSON(arrMetricsAll)

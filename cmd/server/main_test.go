@@ -91,7 +91,7 @@ func TestFuncServerHTTP(t *testing.T) {
 					t.Errorf("Error checking rsa decrypt")
 				}
 				byteTestMsg := []byte(testMsg)
-				if bytes.Compare(decryptMsg, byteTestMsg) != 0 {
+				if !bytes.Equal(decryptMsg, byteTestMsg) {
 					t.Errorf("Error checking rsa decrypt")
 				}
 			})
@@ -136,8 +136,7 @@ func TestFuncServerHTTP(t *testing.T) {
 			id := "TestCounter"
 			hashKey := "TestHash"
 
-			var c repository.Counter
-			c = 58
+			c := repository.Counter(58)
 
 			mt := c.GetMetrics(mType, id, hashKey)
 			msg := fmt.Sprintf("MType: %s, ID: %s, Value: %v, Delta: %d, Hash: %s",
@@ -152,8 +151,7 @@ func TestFuncServerHTTP(t *testing.T) {
 			id := "TestGauge"
 			hashKey := "TestHash"
 
-			var g repository.Gauge
-			g = 0.01
+			g := repository.Gauge(0.01)
 
 			mt := g.GetMetrics(mType, id, hashKey)
 			msg := fmt.Sprintf("MType: %s, ID: %s, Value: %f, Delta: %d, Hash: %s",
@@ -328,11 +326,11 @@ func TestFuncServerHTTP(t *testing.T) {
 
 				r := mux.NewRouter()
 				ts := httptest.NewServer(r)
-				rp := new(api.RepStore)
+				//rp := new(api.RepStore)
 
 				smm := new(repository.SyncMapMetrics)
 				smm.MutexRepo = make(repository.MutexRepo)
-				rp.SyncMapMetrics = smm
+				//rp.SyncMapMetrics = smm
 
 				server.srv.Router = nil
 

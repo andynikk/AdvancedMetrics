@@ -151,9 +151,9 @@ func NewServer(configServer *environment.ServerConfig) Server {
 
 func main() {
 
-	fmt.Println(fmt.Sprintf("Build version: %s", buildVersion))
-	fmt.Println(fmt.Sprintf("Build date: %s", buildDate))
-	fmt.Println(fmt.Sprintf("Build commit: %s", buildCommit))
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
 
 	config := environment.InitConfigServer()
 

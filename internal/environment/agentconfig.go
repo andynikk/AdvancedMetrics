@@ -53,7 +53,7 @@ func GetAgentConfigFile(file *string) AgentConfigFile {
 	out := ParseConfigBytes(res)
 	defer out.Reset()
 
-	if err = json.Unmarshal([]byte(out.String()), &sConfig); err != nil {
+	if err = json.Unmarshal(out.Bytes(), &sConfig); err != nil {
 		return sConfig
 	}
 	if isOSWindows() {
@@ -172,8 +172,7 @@ func (ac *AgentConfig) InitConfigAgentFile() {
 		return
 	}
 
-	var jsonCfg AgentConfigFile
-	jsonCfg = GetAgentConfigFile(&ac.ConfigFilePath)
+	jsonCfg := GetAgentConfigFile(&ac.ConfigFilePath)
 
 	addressServ := jsonCfg.Address
 	reportIntervalMetric, _ := time.ParseDuration(jsonCfg.ReportInterval)

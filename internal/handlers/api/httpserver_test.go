@@ -16,7 +16,7 @@ import (
 
 var srv HTTPServer
 
-func ExampleRepStore_HandlerGetAllMetrics() {
+func (s *HTTPServer) ExampleRepStore_HandlerGetAllMetrics() {
 	ts := httptest.NewServer(srv.Router)
 	defer ts.Close()
 
@@ -34,12 +34,13 @@ func ExampleRepStore_HandlerGetAllMetrics() {
 	msg := fmt.Sprintf("Metrics: %s. HTTP-Status: %d",
 		resp.Header.Get("Metrics-Val"), resp.StatusCode)
 	fmt.Println(msg)
+	_ = resp.Close
 
 	// Output:
 	// Metrics: TestGauge = 0.001. HTTP-Status: 200
 }
 
-func ExampleRepStore_HandlerSetMetricaPOST() {
+func (s *HTTPServer) ExampleRepStore_HandlerSetMetricaPOST() {
 
 	ts := httptest.NewServer(srv.Router)
 	defer ts.Close()
@@ -61,7 +62,7 @@ func ExampleRepStore_HandlerSetMetricaPOST() {
 	// 200
 }
 
-func ExampleRepStore_HandlerGetValue() {
+func (s *HTTPServer) ExampleRepStore_HandlerGetValue() {
 
 	ts := httptest.NewServer(srv.Router)
 	defer ts.Close()
