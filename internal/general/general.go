@@ -278,20 +278,22 @@ func (rs *RepStore[T]) HandlerUpdatesMetricJSON(h Header, b []byte) error {
 
 	err := errors.New("")
 	if strings.Contains(contentEncryption, constants.TypeEncryption) {
-		if b, err = PK.RsaDecrypt(b); err != nil {
+		b, err = PK.RsaDecrypt(b)
+
+		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return errs.ErrDecrypt
 		}
 	}
 
 	if strings.Contains(contentEncoding, "gzip") {
-		b, err = compression.Decompress(b)
+		_, err := compression.Decompress(b)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return errs.ErrDecompress
 		}
 	}
-	if err = rs.Updates(b); err != nil {
+	if err := rs.Updates(b); err != nil {
 		return err
 	}
 

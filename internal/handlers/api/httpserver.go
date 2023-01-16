@@ -220,12 +220,13 @@ func (s *HTTPServer) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Re
 // HandlerSetMetricaPOST Handler, который работает с POST запросом формата "/update/{metType}/{metName}/{metValue}".
 // Где metType наименование типа метрики, metName наименование метрики, metValue значение метрики.
 // Значение метрики записывается во временное хранилище метрик repository.MapMetrics
-func (s *HTTPServer) HandlerSetMetricaPOST(rw http.ResponseWriter, rq *http.Request) {
+func (s *HTTPServer) HandlerSetMetricaPOST(w http.ResponseWriter, r *http.Request) {
 
-	metType := mux.Vars(rq)["metType"]
-	metName := mux.Vars(rq)["metName"]
-	metValue := mux.Vars(rq)["metValue"]
+	metType := mux.Vars(r)["metType"]
+	metName := mux.Vars(r)["metName"]
+	metValue := mux.Vars(r)["metValue"]
 
 	err := s.RepStore.HandlerSetMetricaPOST(metType, metName, metValue)
-	rw.WriteHeader(errs.StatusHTTP(err))
+	w.WriteHeader(errs.StatusHTTP(err))
+	fmt.Println(errs.StatusHTTP(err))
 }
