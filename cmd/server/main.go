@@ -45,8 +45,9 @@ type Server interface {
 
 func (s *serverHTTP) Start() error {
 	HTTPServer := &http.Server{
-		Addr:    s.storage.Config.Address,
-		Handler: s.srv.Router,
+		Addr: s.storage.Config.Address,
+		//Handler: &s.srv.Router,
+		Handler: s.srv.RouterChi,
 	}
 
 	if err := HTTPServer.ListenAndServe(); err != nil {
@@ -114,7 +115,8 @@ func newHTTPServer(configServer *environment.ServerConfig) *serverHTTP {
 	srv := api.HTTPServer{
 		RepStore: gRepStore,
 	}
-	api.InitRoutersMux(&srv)
+	//api.InitRoutersMux(&srv)
+	api.InitRoutersChi(&srv)
 	server.srv = srv
 
 	return server

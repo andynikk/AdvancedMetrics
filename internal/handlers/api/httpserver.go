@@ -7,6 +7,8 @@ import (
 	"net/http/pprof"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/mux"
 
 	"github.com/andynikk/advancedmetrics/internal/constants"
@@ -34,8 +36,9 @@ func (et MetricError) String() string {
 }
 
 type HTTPServer struct {
-	RepStore general.RepStore[handlers.RepStore]
-	Router   *mux.Router
+	RepStore  general.RepStore[handlers.RepStore]
+	Router    mux.Router
+	RouterChi chi.Router
 }
 
 func InitRoutersMux(s *HTTPServer) {
@@ -66,7 +69,43 @@ func InitRoutersMux(s *HTTPServer) {
 	r.Handle("/debug/mutex", pprof.Handler("mutex"))
 	r.Handle("/debug/mutex", pprof.Handler("mutex"))
 
-	s.Router = r
+	s.Router = *r
+}
+
+func InitRoutersChi(s *HTTPServer) {
+
+	r := chi.NewRouter()
+
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.StripSlashes)
+
+	r.HandleFunc("/", s.HandleFunc)
+	r.NotFound(s.HandlerNotFound)
+
+	r.Get("/", s.HandlerGetAllMetrics)
+	r.Get("/value/{metType}/{metName}", s.HandlerGetValue)
+	r.Post("/update/{metType}/{metName}/{metValue}", s.HandlerSetMetricaPOST)
+	r.Post("/update", s.HandlerUpdateMetricJSON)
+	r.Post("/updates", s.HandlerUpdatesMetricJSON)
+	r.Post("/value", s.HandlerValueMetricaJSON)
+	r.Get("/ping", s.HandlerPingDB)
+
+	s.RouterChi = r
+}
+
+func (s *HTTPServer) HandlerNotFound(rw http.ResponseWriter, r *http.Request) {
+
+	http.Error(rw, "Метрика "+r.URL.Path+" не найдена", http.StatusNotFound)
+
+}
+
+func (s *HTTPServer) HandleFunc(rw http.ResponseWriter, rq *http.Request) {
+
+	defer rq.Body.Close()
+	rw.WriteHeader(http.StatusOK)
 }
 
 // NewRepStore инициализация хранилища, роутера, заполнение настроек.
@@ -227,7 +266,7 @@ func (s *HTTPServer) HandlerSetMetricaPOST(w http.ResponseWriter, r *http.Reques
 	metValue := mux.Vars(r)["metValue"]
 
 	err := s.RepStore.HandlerSetMetricaPOST(metType, metName, metValue)
-	//w.WriteHeader(errs.StatusHTTP(err))
-	w.WriteHeader(http.StatusBadRequest)
-	fmt.Println(errs.StatusHTTP(err))
+	w.WriteHeader(errs.StatusHTTP(err))
+	//w.WriteHeader(http.StatusBadRequest)
+	//fmt.Println(errs.StatusHTTP(err))
 }
