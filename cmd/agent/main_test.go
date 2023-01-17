@@ -15,6 +15,8 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/repository"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func TestmakeMsg(adresServer string, memStats MetricsGauge) string {
@@ -42,8 +44,8 @@ func TestFuncAgen(t *testing.T) {
 	runtime.ReadMemStats(&mem)
 
 	t.Run("Checking init config", func(t *testing.T) {
-		a.cfg = environment.InitConfigAgent()
-		if a.cfg.Address == "" {
+		a.config = environment.InitConfigAgent()
+		if a.config.Address == "" {
 			t.Errorf("Error checking init config")
 		}
 	})
@@ -59,7 +61,7 @@ func TestFuncAgen(t *testing.T) {
 			t.Errorf("Structure creation error (%s)", argErr)
 		}
 		t.Run("Creating a submission line", func(t *testing.T) {
-			adressServer := a.cfg.Address
+			adressServer := a.config.Address
 			var resultStr = fmt.Sprintf("http://%s/update/gauge/Alloc/0.1"+
 				"\nhttp://%s/update/gauge/BuckHashSys/0.002", adressServer, adressServer)
 
@@ -72,8 +74,8 @@ func TestFuncAgen(t *testing.T) {
 
 	t.Run("Checking rsa crypt", func(t *testing.T) {
 		t.Run("Checking init crypto key", func(t *testing.T) {
-			a.KeyEncryption, _ = encryption.InitPublicKey(a.cfg.CryptoKey)
-			if a.cfg.CryptoKey != "" && a.KeyEncryption.PublicKey == nil {
+			a.KeyEncryption, _ = encryption.InitPublicKey(a.config.CryptoKey)
+			if a.config.CryptoKey != "" && a.KeyEncryption.PublicKey == nil {
 				t.Errorf("Error checking init crypto key")
 			}
 			t.Run("Checking rsa encrypt", func(t *testing.T) {
@@ -129,7 +131,7 @@ func TestFuncAgen(t *testing.T) {
 				}
 
 				resp := httptest.NewRecorder()
-				req, err := http.NewRequest("POST", fmt.Sprintf("%s/updates", a.cfg.Address),
+				req, err := http.NewRequest("POST", fmt.Sprintf("%s/updates", a.config.Address),
 					strings.NewReader(string(gziparrMetrics)))
 				if err != nil {
 					t.Fatal(err)
@@ -173,13 +175,25 @@ func TestFuncAgen(t *testing.T) {
 
 func BenchmarkSendMetrics(b *testing.B) {
 	a := agent{}
-	ac := &environment.AgentConfig{}
-	a.cfg = ac
-	a.cfg.Address = "localhost:8080"
+	a.config = environment.InitConfigAgent()
+	if a.config.Address == "" {
+		return
+	}
+
+	if a.config.StringTypeServer == constants.TypeSrvGRPC.String() {
+		conn, err := grpc.Dial(constants.AddressServer, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			return
+		}
+		a.GRPCClientConn = conn
+	}
+
+	certPublicKey, _ := encryption.InitPublicKey(a.config.CryptoKey)
+	a.KeyEncryption = certPublicKey
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < 10000; i++ {
-		var allMetrics emtyArrMetrics
+		var allMetrics emptyArrMetrics
 		mapMetricsButch := MapMetricsButch{}
 
 		val := repository.Gauge(0)
@@ -194,7 +208,7 @@ func BenchmarkSendMetrics(b *testing.B) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			a.goPost2Server(&mapMetricsButch)
+			a.goPost2Server(mapMetricsButch)
 		}()
 	}
 	wg.Wait()

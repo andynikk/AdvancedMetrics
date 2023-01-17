@@ -30,8 +30,7 @@ func ExampleGauge_GetMetrics() {
 	id := "TestGauge"
 	hashKey := "TestHash"
 
-	var g repository.Gauge
-	g = 0.01
+	g := repository.Gauge(0.01)
 
 	mt := g.GetMetrics(mType, id, hashKey)
 	msg := fmt.Sprintf("MType: %s, ID: %s, Value: %f, Delta: %d, Hash: %s",
@@ -44,7 +43,7 @@ func ExampleGauge_GetMetrics() {
 
 func ExampleGauge_Set() {
 	var g repository.Gauge
-	var f float64 = 0.01
+	var f = 0.01
 	v := encoding.Metrics{
 		ID:    "",
 		MType: "",
@@ -95,8 +94,7 @@ func ExampleCounter_GetMetrics() {
 	id := "TestCounter"
 	hashKey := "TestHash"
 
-	var c repository.Counter
-	c = 58
+	var c repository.Counter = 58
 
 	mt := c.GetMetrics(mType, id, hashKey)
 	msg := fmt.Sprintf("MType: %s, ID: %s, Value: %v, Delta: %d, Hash: %s",

@@ -24,10 +24,6 @@ type Counter int64
 
 type MutexRepo map[string]Metric
 
-type MapMetrics struct {
-	MutexRepo
-}
-
 type Metric interface {
 	String() string
 	Type() string
@@ -132,12 +128,12 @@ func (c *Counter) Type() string {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func (mm *MapMetrics) TextMetricsAndValue() []string {
+func (mm *MutexRepo) TextMetricsAndValue() []string {
 	const msgFormat = "%s = %s"
 
 	var msg []string
 
-	for key, val := range mm.MutexRepo {
+	for key, val := range *mm {
 		msg = append(msg, fmt.Sprintf(msgFormat, key, val.String()))
 	}
 

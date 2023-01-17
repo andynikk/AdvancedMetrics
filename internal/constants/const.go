@@ -4,10 +4,16 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/logger"
 )
 
-type TypeMetricsStorage int
+type StorageType int
+type TypeServer int
 
 const (
-	MetricsStorageDB TypeMetricsStorage = iota
+	TypeSrvGRPC TypeServer = iota
+	TypeSrvHTTP
+)
+
+const (
+	MetricsStorageDB StorageType = iota
 	MetricsStorageFile
 
 	TimeLivingCertificateYaer   = 10
@@ -71,10 +77,17 @@ const (
 					
 					ALTER TABLE IF EXISTS metrics.store
 						OWNER to postgres;`
+
+	SepIPAddress = ";"
 )
 
-func (tmc TypeMetricsStorage) String() string {
-	return [...]string{"db", "file"}[tmc]
+func (st StorageType) String() string {
+	return [...]string{"db", "file"}[st]
+}
+
+func (ts TypeServer) String() string {
+	return [...]string{"gRPC", "HTTP"}[ts]
 }
 
 var Logger logger.Logger
+var TrustedSubnet string
