@@ -118,30 +118,33 @@ func TestFuncServerHTTP(t *testing.T) {
 		})
 	})
 
-	t.Run("Checking connect DB", func(t *testing.T) {
-		t.Run("Checking create DB table", func(t *testing.T) {
-			mapTypeStore, err := repository.InitStoreDB(rp.Config.StorageType, rp.Config.DatabaseDsn)
-			fmt.Println("-----", len(mapTypeStore))
-			fmt.Println("-----", len(rp.Config.StorageType))
-			fmt.Println("-----", rp.Config.DatabaseDsn)
+	if rp.Config.DatabaseDsn != "" {
+		t.Run("Checking connect DB", func(t *testing.T) {
+			t.Run("Checking create DB table", func(t *testing.T) {
+				mapTypeStore, err := repository.InitStoreDB(rp.Config.StorageType, rp.Config.DatabaseDsn)
+				fmt.Println("-----", len(mapTypeStore))
+				fmt.Println("-----", len(rp.Config.StorageType))
+				fmt.Println("-----", rp.Config.DatabaseDsn)
+				fmt.Println("-----", rp.Config.StoreFile)
 
-			if err != nil {
-				t.Errorf(fmt.Sprintf("Error create DB table: %s", err.Error()))
-			}
-			//rp.Config.StorageType = storageType
-			t.Run("Checking handlers /ping GET", func(t *testing.T) {
-
-				//mapTypeStore := rp.Config.StorageType
-				if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
-					t.Errorf("Error handlers 1 /ping GET")
+				if err != nil {
+					t.Errorf(fmt.Sprintf("Error create DB table: %s", err.Error()))
 				}
+				//rp.Config.StorageType = storageType
+				t.Run("Checking handlers /ping GET", func(t *testing.T) {
 
-				if mapTypeStore[constants.MetricsStorageDB.String()].ConnDB() == nil {
-					t.Errorf("Error handlers 2 /ping GET")
-				}
+					//mapTypeStore := rp.Config.StorageType
+					if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
+						t.Errorf("Error handlers 1 /ping GET")
+					}
+
+					if mapTypeStore[constants.MetricsStorageDB.String()].ConnDB() == nil {
+						t.Errorf("Error handlers 2 /ping GET")
+					}
+				})
 			})
 		})
-	})
+	}
 
 	t.Run("Checking metric methods", func(t *testing.T) {
 		t.Run(`Checking method "String" type "Counter"`, func(t *testing.T) {
