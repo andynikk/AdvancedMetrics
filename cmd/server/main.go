@@ -159,14 +159,20 @@ func main() {
 	fmt.Printf("Build date: %s\n", buildDate)
 	fmt.Printf("Build commit: %s\n", buildCommit)
 
+	fmt.Println("================1")
 	config := environment.InitConfigServer()
-
+	fmt.Println("================2")
 	server := NewServer(config)
+	fmt.Println("================3")
 	go server.RestoreData()
+	fmt.Println("================4")
 	go server.BackupData()
+	fmt.Println("================5")
 
 	go func() {
+		fmt.Println("================6")
 		err := server.Start()
+		fmt.Println("================7")
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return
