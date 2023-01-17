@@ -44,6 +44,7 @@ type Server interface {
 }
 
 func (s *serverHTTP) Start() error {
+	fmt.Println("++++++++++++++14 Address", s.storage.Config.Address)
 	HTTPServer := &http.Server{
 		Addr: s.storage.Config.Address,
 		//Handler: &s.srv.Router,
