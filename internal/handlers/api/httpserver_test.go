@@ -31,10 +31,10 @@ func (s *HTTPServer) ExampleRepStore_HandlerGetAllMetrics() {
 	if err != nil {
 		return
 	}
+	defer resp.Body.Close()
 	msg := fmt.Sprintf("Metrics: %s. HTTP-Status: %d",
 		resp.Header.Get("Metrics-Val"), resp.StatusCode)
 	fmt.Println(msg)
-	_ = resp.Close
 
 	// Output:
 	// Metrics: TestGauge = 0.001. HTTP-Status: 200
@@ -56,6 +56,7 @@ func (s *HTTPServer) ExampleRepStore_HandlerSetMetricaPOST() {
 	if err != nil {
 		return
 	}
+	defer resp.Body.Close()
 	fmt.Print(resp.StatusCode)
 
 	// Output:
@@ -78,6 +79,7 @@ func (s *HTTPServer) ExampleRepStore_HandlerGetValue() {
 	if err != nil {
 		return
 	}
+	defer resp.Body.Close()
 	fmt.Print(resp.StatusCode)
 
 	// Output:

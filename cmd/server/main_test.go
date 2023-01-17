@@ -126,13 +126,15 @@ func TestFuncServerHTTP(t *testing.T) {
 			}
 			rp.Config.StorageType = storageType
 			t.Run("Checking handlers /ping GET", func(t *testing.T) {
+
 				mapTypeStore := rp.Config.StorageType
+				fmt.Println("-----", len(mapTypeStore))
 				if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
-					t.Errorf("Error handlers /ping GET")
+					t.Errorf("Error handlers 1 /ping GET")
 				}
 
 				if mapTypeStore[constants.MetricsStorageDB.String()].ConnDB() == nil {
-					t.Errorf("Error handlers /ping GET")
+					t.Errorf("Error handlers 2 /ping GET")
 				}
 			})
 		})
@@ -576,20 +578,20 @@ func TestFuncServerGRPC(t *testing.T) {
 	t.Run("Checking handlers Update (gRPC)", func(t *testing.T) {
 		tests := []struct {
 			name           string
-			request        api2.UpdateRequest
+			request        *api2.UpdateRequest
 			wantStatusCode codes.Code
 		}{
-			{name: "Проверка на установку значения counter", request: api2.UpdateRequest{MetType: []byte("counter"),
+			{name: "Проверка на установку значения counter", request: &api2.UpdateRequest{MetType: []byte("counter"),
 				MetName: []byte("testSetGet332"), MetValue: []byte("6")}, wantStatusCode: codes.OK},
-			{name: "Проверка на не правильный тип метрики", request: api2.UpdateRequest{MetType: []byte("notcounter"),
+			{name: "Проверка на не правильный тип метрики", request: &api2.UpdateRequest{MetType: []byte("notcounter"),
 				MetName: []byte("testSetGet332"), MetValue: []byte("6")}, wantStatusCode: codes.Unimplemented},
-			{name: "Проверка на не правильное значение метрики", request: api2.UpdateRequest{MetType: []byte("counter"),
+			{name: "Проверка на не правильное значение метрики", request: &api2.UpdateRequest{MetType: []byte("counter"),
 				MetName: []byte("testSetGet332"), MetValue: []byte("non")}, wantStatusCode: codes.PermissionDenied},
 		}
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				textErr, err := GRPCServer.UpdateOneMetrics(ctx, &tt.request)
+				textErr, err := GRPCServer.UpdateOneMetrics(ctx, tt.request)
 				if errs.CodeGRPC(err) != tt.wantStatusCode {
 					t.Errorf("Error checking handlers Update (gRPC %s). %s", textErr, tt.name)
 				}

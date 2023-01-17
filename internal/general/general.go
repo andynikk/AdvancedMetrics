@@ -514,7 +514,7 @@ func (rs *RepStore[T]) HandlerGetValue(metName []byte) (string, error) {
 
 	if _, findKey := smm.MutexRepo[string(metName)]; !findKey {
 		constants.Logger.InfoLog(fmt.Sprintf("== %d", 3))
-		return "", errs.ErrStatusInternalServer
+		return "", errs.ErrNotFound
 	}
 
 	strMetric := smm.MutexRepo[string(metName)].String()
