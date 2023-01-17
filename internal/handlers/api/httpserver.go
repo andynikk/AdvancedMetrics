@@ -199,7 +199,9 @@ func (s *HTTPServer) HandlerGetAllMetrics(rw http.ResponseWriter, rq *http.Reque
 // Где metType наименование типа метрики, metName наименование метрики
 func (s *HTTPServer) HandlerGetValue(rw http.ResponseWriter, rq *http.Request) {
 
-	metName := mux.Vars(rq)["metName"]
+	//metName := mux.Vars(rq)["metName"]
+	metName := chi.URLParam(rq, "metName")
+
 	val, err := s.RepStore.HandlerGetValue([]byte(metName))
 	if err != nil {
 		constants.Logger.ErrorLog(err)
@@ -261,9 +263,13 @@ func (s *HTTPServer) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Re
 // Значение метрики записывается во временное хранилище метрик repository.MapMetrics
 func (s *HTTPServer) HandlerSetMetricaPOST(w http.ResponseWriter, r *http.Request) {
 
-	metType := mux.Vars(r)["metType"]
-	metName := mux.Vars(r)["metName"]
-	metValue := mux.Vars(r)["metValue"]
+	//metType := mux.Vars(r)["metType"]
+	//metName := mux.Vars(r)["metName"]
+	//metValue := mux.Vars(r)["metValue"]
+
+	metType := chi.URLParam(r, "metType")
+	metName := chi.URLParam(r, "metName")
+	metValue := chi.URLParam(r, "metValue")
 
 	err := s.RepStore.HandlerSetMetricaPOST(metType, metName, metValue)
 	w.WriteHeader(errs.StatusHTTP(err))
