@@ -227,8 +227,6 @@ func (rs *RepStore[T]) setValueInMap(metType string, metName string, metValue st
 			if ok := valG.SetFromText(metValue); !ok {
 				return http.StatusBadRequest
 			}
-
-			smm.MutexRepo[metName] = &valG
 		}
 
 	case CounterMetric.String():
@@ -243,8 +241,6 @@ func (rs *RepStore[T]) setValueInMap(metType string, metName string, metValue st
 			if ok := valC.SetFromText(metValue); !ok {
 				return http.StatusBadRequest
 			}
-
-			smm.MutexRepo[metName] = &valC
 		}
 	default:
 		return http.StatusNotImplemented
