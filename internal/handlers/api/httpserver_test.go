@@ -113,7 +113,8 @@ func init() {
 
 	rp := srv.RepStore.Get(constants.TypeSrvHTTP.String())
 	rp.MutexRepo = make(repository.MutexRepo)
-	InitRoutersMux(&srv)
+	//InitRoutersMux(&srv)
+	InitRoutersChi(&srv)
 
 	valG := repository.Gauge(0)
 	if ok := valG.SetFromText("0.001"); !ok {

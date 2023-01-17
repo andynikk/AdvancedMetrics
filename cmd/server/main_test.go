@@ -19,7 +19,7 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/handlers"
 	"github.com/andynikk/advancedmetrics/internal/handlers/api"
 	"github.com/andynikk/advancedmetrics/internal/repository"
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
 )
 
 func TestFuncServerHTTP(t *testing.T) {
@@ -48,8 +48,9 @@ func TestFuncServerHTTP(t *testing.T) {
 	rp.MutexRepo = make(repository.MutexRepo)
 
 	t.Run("Checking init router", func(t *testing.T) {
-		api.InitRoutersMux(&server.srv)
-		if server.srv.Router == nil {
+		//api.InitRoutersMux(&server.srv)
+		api.InitRoutersChi(&server.srv)
+		if server.srv.RouterChi == nil {
 			t.Errorf("Error checking init router")
 		}
 	})
@@ -240,7 +241,7 @@ func TestFuncServerHTTP(t *testing.T) {
 	})
 
 	t.Run("Checking handlers", func(t *testing.T) {
-		ts := httptest.NewServer(server.srv.Router)
+		ts := httptest.NewServer(server.srv.RouterChi)
 		defer ts.Close()
 
 		t.Run("Checking handler /update/{metType}/{metName}/{metValue}/", func(t *testing.T) {
@@ -324,7 +325,8 @@ func TestFuncServerHTTP(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 
-				r := mux.NewRouter()
+				//r := mux.NewRouter()
+				r := chi.NewRouter()
 				ts := httptest.NewServer(r)
 				//rp := new(api.RepStore)
 
@@ -332,9 +334,10 @@ func TestFuncServerHTTP(t *testing.T) {
 				smm.MutexRepo = make(repository.MutexRepo)
 				//rp.SyncMapMetrics = smm
 
-				server.srv.Router = nil
+				server.srv.RouterChi = nil
 
-				r.HandleFunc("/update/{metType}/{metName}/{metValue}", server.srv.HandlerSetMetricaPOST).Methods("POST")
+				//r.HandleFunc("/update/{metType}/{metName}/{metValue}", server.srv.HandlerSetMetricaPOST).Methods("POST")
+				r.Post("/update/{metType}/{metName}/{metValue}", server.srv.HandlerSetMetricaPOST)
 
 				defer ts.Close()
 				resp := testRequest(t, ts, http.MethodPost, tt.request, nil)

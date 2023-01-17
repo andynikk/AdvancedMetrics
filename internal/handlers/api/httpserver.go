@@ -37,7 +37,7 @@ func (et MetricError) String() string {
 
 type HTTPServer struct {
 	RepStore  general.RepStore[handlers.RepStore]
-	Router    mux.Router
+	Router    *mux.Router
 	RouterChi chi.Router
 }
 
@@ -69,7 +69,7 @@ func InitRoutersMux(s *HTTPServer) {
 	r.Handle("/debug/mutex", pprof.Handler("mutex"))
 	r.Handle("/debug/mutex", pprof.Handler("mutex"))
 
-	s.Router = *r
+	s.Router = r
 }
 
 func InitRoutersChi(s *HTTPServer) {
