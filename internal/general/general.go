@@ -468,13 +468,13 @@ func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b *[]byte) (Header, []b
 	smm.Lock()
 	defer smm.Unlock()
 
+	fmt.Println("+++++++++3", metType, metName, cfg.Key)
 	if _, findKey := smm.MutexRepo[metName]; !findKey {
-
+		fmt.Println("+++++++++4", "Error")
 		constants.Logger.InfoLog(fmt.Sprintf("== %d %s %d %s", 1, metName, len(smm.MutexRepo), cfg.DatabaseDsn))
 		return nil, nil, errs.ErrNotFound
 	}
 
-	fmt.Println("+++++++++3", metType, metName, cfg.Key)
 	mt := smm.MutexRepo[metName].GetMetrics(metType, metName, cfg.Key)
 	metricsJSON, err := mt.MarshalMetrica()
 	if err != nil {
