@@ -328,14 +328,17 @@ func (rs *RepStore[T]) HandlerUpdateMetricJSON(h Header, b []byte) error {
 
 	bodyJSON := bytes.NewReader(b)
 
-	var v []encoding.Metrics
+	var v encoding.Metrics
 	err := json.NewDecoder(bodyJSON).Decode(&v)
 	if err != nil {
 		constants.Logger.InfoLog(fmt.Sprintf("$$ 3 %s", err.Error()))
 		return errs.ErrGetJSON
 	}
 
-	err = rs.SetValueInMapJSON(v)
+	var vv []encoding.Metrics
+	vv = append(vv, v)
+
+	err = rs.SetValueInMapJSON(vv)
 	if err != nil {
 		constants.Logger.ErrorLog(err)
 		return err
@@ -344,7 +347,7 @@ func (rs *RepStore[T]) HandlerUpdateMetricJSON(h Header, b []byte) error {
 	cfg := rs.getConfigRepStore()
 
 	var arrMetrics encoding.ArrMetrics
-	for _, val := range v {
+	for _, val := range vv {
 		mt := smm.MutexRepo[val.ID].GetMetrics(val.MType, val.ID, cfg.Key)
 		arrMetrics = append(arrMetrics, mt)
 	}
