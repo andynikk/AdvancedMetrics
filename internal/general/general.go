@@ -474,6 +474,7 @@ func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b *[]byte) (Header, []b
 		return nil, nil, errs.ErrNotFound
 	}
 
+	fmt.Println("+++++++++3", metType, metName, cfg.Key)
 	mt := smm.MutexRepo[metName].GetMetrics(metType, metName, cfg.Key)
 	metricsJSON, err := mt.MarshalMetrica()
 	if err != nil {
@@ -527,7 +528,7 @@ func (rs *RepStore[T]) HandlerGetValue(metName []byte) (string, error) {
 func (rs *RepStore[T]) HandlerGetAllMetrics(h Header) (Header, []byte) {
 
 	smm := rs.getSyncMapMetricsRepStore()
-	arrMetricsAndValue := smm.MapMetrics.TextMetricsAndValue()
+	arrMetricsAndValue := smm.TextMetricsAndValue()
 
 	var strMetrics string
 	content := `<!DOCTYPE html>

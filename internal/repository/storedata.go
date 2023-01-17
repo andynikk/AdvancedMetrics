@@ -32,7 +32,7 @@ type TypeStoreDataFile struct {
 
 type SyncMapMetrics struct {
 	sync.Mutex
-	MapMetrics
+	MutexRepo
 }
 
 type MapTypeStore = map[string]TypeStoreData
