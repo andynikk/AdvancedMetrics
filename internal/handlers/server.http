@@ -3,7 +3,7 @@ POST http://localhost:8080/value/
 Content-Type: application/json
 
 {
-  "id": "FreeMemory",
+  "id": "RandomValue",
   "type": "gauge"
 }
 

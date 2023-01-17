@@ -427,16 +427,16 @@ func (rs *RepStore[T]) Updates(msg []byte) error {
 // HandlerValueMetricaJSON Handler, который работает с POST запросом формата "/value".
 // В теле получает JSON с имененм типа и именем метрики. Струтура JSON: encoding.Metrics.
 // Может принимать JSON в жатом виде gzip. Возвращает значение метрики по типу и наименованию.
-func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b []byte) (Header, []byte, error) {
+func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b *[]byte) (Header, []byte, error) {
 
-	acceptEncoding := h["accept-encoding"]
+	//acceptEncoding := h["accept-encoding"]
 	contentEncoding := h["content-encoding"]
 	contentEncryption := h["content-encryption"]
 
 	PK := rs.getPKRepStore()
 	//err := errors.New("")
 	if strings.Contains(contentEncryption, constants.TypeEncryption) {
-		_, err := PK.RsaDecrypt(b)
+		_, err := PK.RsaDecrypt(*b)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return nil, nil, errs.ErrDecrypt
@@ -444,14 +444,14 @@ func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b []byte) (Header, []by
 	}
 
 	if strings.Contains(contentEncoding, "gzip") {
-		_, err := compression.Decompress(b)
+		_, err := compression.Decompress(*b)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return nil, nil, errs.ErrDecompress
 		}
 	}
 
-	bodyJSON := bytes.NewReader(b)
+	bodyJSON := bytes.NewReader(*b)
 
 	v := encoding.Metrics{}
 	err := json.NewDecoder(bodyJSON).Decode(&v)
@@ -493,7 +493,8 @@ func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b []byte) (Header, []by
 	hReturn["content-type"] = "application/json"
 
 	var bodyBate []byte
-	if strings.Contains(acceptEncoding, "gzip") {
+	//if strings.Contains(acceptEncoding, "gzip") {
+	if strings.Contains(contentEncoding, "gzip") {
 		hReturn["content-encoding"] = "gzip"
 		bodyBate = compData
 	} else {

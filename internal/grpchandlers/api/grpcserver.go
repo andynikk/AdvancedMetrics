@@ -81,7 +81,7 @@ func (s *GRPCServer) PingDataBases(ctx context.Context, req *EmptyRequest) (*Tex
 func (s *GRPCServer) GetValueJSON(ctx context.Context, req *UpdatesRequest) (*FullResponse, error) {
 	header := FillHeader(ctx)
 
-	h, body, err := s.RepStore.HandlerValueMetricaJSON(header, req.Body)
+	h, body, err := s.RepStore.HandlerValueMetricaJSON(header, &req.Body)
 	ok := true
 	if err != nil {
 		ok = false
