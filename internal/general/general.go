@@ -89,7 +89,7 @@ func (rs *RepStore[T]) getConfigRepStore() *environment.ServerConfig {
 	return &environment.ServerConfig{}
 }
 
-func (rs *RepStore[T]) getSyncMapMetricsRepStore() *repository.SyncMapMetrics {
+func (rs *RepStore[T]) GetSyncMapMetricsRepStore() *repository.SyncMapMetrics {
 	if t, ok := rs.data[constants.TypeSrvGRPC.String()]; ok {
 		return any(t).(grpchandlers.RepStore).SyncMapMetrics
 	}
@@ -124,7 +124,7 @@ func (rs *RepStore[T]) RestoreData() {
 func (rs *RepStore[T]) SetValueInMapJSON(a []encoding.Metrics) error {
 
 	key := rs.getConfigRepStore().Key
-	smm := rs.getSyncMapMetricsRepStore()
+	smm := rs.GetSyncMapMetricsRepStore()
 
 	smm.Lock()
 	defer smm.Unlock()
@@ -198,7 +198,7 @@ func (rs *RepStore[T]) BackupData() {
 func (rs *RepStore[T]) PrepareDataForBackup() encoding.ArrMetrics {
 
 	cKey := rs.getConfigRepStore().Key
-	smm := rs.getSyncMapMetricsRepStore()
+	smm := rs.GetSyncMapMetricsRepStore()
 
 	var storedData encoding.ArrMetrics
 	for key, val := range smm.MutexRepo {
@@ -212,7 +212,7 @@ func (rs *RepStore[T]) PrepareDataForBackup() encoding.ArrMetrics {
 // При успешном выполнении возвращает http-статус "ОК" (200)
 func (rs *RepStore[T]) setValueInMap(metType string, metName string, metValue string) int {
 
-	smm := rs.getSyncMapMetricsRepStore()
+	smm := rs.GetSyncMapMetricsRepStore()
 	switch metType {
 	case GaugeMetric.String():
 		if val, findKey := smm.MutexRepo[metName]; findKey {
@@ -238,6 +238,7 @@ func (rs *RepStore[T]) setValueInMap(metType string, metName string, metValue st
 
 			valC := repository.Counter(0)
 			smm.MutexRepo[metName] = &valC
+
 			if ok := valC.SetFromText(metValue); !ok {
 				return http.StatusBadRequest
 			}
@@ -254,7 +255,7 @@ func (rs *RepStore[T]) setValueInMap(metType string, metName string, metValue st
 func (rs *RepStore[T]) Shutdown() {
 
 	storageType := rs.getConfigRepStore().StorageType
-	smm := rs.getSyncMapMetricsRepStore()
+	smm := rs.GetSyncMapMetricsRepStore()
 
 	smm.Lock()
 	defer smm.Unlock()
@@ -339,7 +340,7 @@ func (rs *RepStore[T]) HandlerUpdateMetricJSON(h Header, b []byte) error {
 		constants.Logger.ErrorLog(err)
 		return err
 	}
-	smm := rs.getSyncMapMetricsRepStore()
+	smm := rs.GetSyncMapMetricsRepStore()
 	cfg := rs.getConfigRepStore()
 
 	var arrMetrics encoding.ArrMetrics
@@ -357,7 +358,7 @@ func (rs *RepStore[T]) HandlerUpdateMetricJSON(h Header, b []byte) error {
 
 func (rs *RepStore[T]) HandlerSetMetricaPOST(metType string, metName string, metValue string) error {
 
-	smm := rs.getSyncMapMetricsRepStore()
+	smm := rs.GetSyncMapMetricsRepStore()
 	smm.Lock()
 	defer smm.Unlock()
 
@@ -461,7 +462,7 @@ func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b *[]byte) (Header, []b
 	metType := v.MType
 	metName := v.ID
 
-	smm := rs.getSyncMapMetricsRepStore()
+	smm := rs.GetSyncMapMetricsRepStore()
 	cfg := rs.getConfigRepStore()
 
 	smm.Lock()
@@ -507,7 +508,7 @@ func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b *[]byte) (Header, []b
 // Где metType наименование типа метрики, metName наименование метрики
 func (rs *RepStore[T]) HandlerGetValue(metName []byte) (string, error) {
 
-	smm := rs.getSyncMapMetricsRepStore()
+	smm := rs.GetSyncMapMetricsRepStore()
 
 	smm.Lock()
 	defer smm.Unlock()
@@ -526,7 +527,7 @@ func (rs *RepStore[T]) HandlerGetValue(metName []byte) (string, error) {
 // Выводит на страницу список наименований и значений метрик.
 func (rs *RepStore[T]) HandlerGetAllMetrics(h Header) (Header, []byte) {
 
-	smm := rs.getSyncMapMetricsRepStore()
+	smm := rs.GetSyncMapMetricsRepStore()
 	arrMetricsAndValue := smm.TextMetricsAndValue()
 
 	var strMetrics string

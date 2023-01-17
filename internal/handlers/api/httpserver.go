@@ -240,6 +240,8 @@ func (s *HTTPServer) HandlerPingDB(rw http.ResponseWriter, rq *http.Request) {
 // Может принимать JSON в жатом виде gzip. Возвращает значение метрики по типу и наименованию.
 func (s *HTTPServer) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Request) {
 
+	smm := s.RepStore.GetSyncMapMetricsRepStore()
+	fmt.Println("+++++++++9", len(smm.MutexRepo))
 	h := FillHeader(rq.Header)
 
 	bytBody, err := io.ReadAll(rq.Body)
@@ -257,6 +259,7 @@ func (s *HTTPServer) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Re
 	}
 
 	fmt.Println("+++++++++2", string(b))
+	fmt.Println("+++++++++10", len(smm.MutexRepo))
 	if _, err = rw.Write(b); err != nil {
 		constants.Logger.ErrorLog(err)
 		return
@@ -280,6 +283,8 @@ func (s *HTTPServer) HandlerSetMetricaPOST(w http.ResponseWriter, r *http.Reques
 	err := s.RepStore.HandlerSetMetricaPOST(metType, metName, metValue)
 
 	w.WriteHeader(errs.StatusHTTP(err))
+	smm := s.RepStore.GetSyncMapMetricsRepStore()
+	fmt.Println("+++++++++8", len(smm.MutexRepo))
 	//w.WriteHeader(http.StatusBadRequest)
 	//fmt.Println(errs.StatusHTTP(err))
 }
