@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/mux"
 
 	"github.com/andynikk/advancedmetrics/internal/constants"
@@ -76,10 +75,10 @@ func InitRoutersChi(s *HTTPServer) {
 
 	r := chi.NewRouter()
 
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	//r.Use(middleware.RequestID)
+	//r.Use(middleware.RealIP)
+	//r.Use(middleware.Logger)
+	//r.Use(middleware.Recoverer)
 	//r.Use(middleware.StripSlashes)
 
 	r.HandleFunc("/", s.HandleFunc)
@@ -109,7 +108,7 @@ func InitRoutersChi(s *HTTPServer) {
 
 func (s *HTTPServer) HandlerNotFound(rw http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("+++++++++12", "aa")
+	fmt.Println("+++++++++12", "не найдена")
 	http.Error(rw, "Метрика "+r.URL.Path+" не найдена", http.StatusNotFound)
 
 }

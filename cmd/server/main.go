@@ -144,6 +144,7 @@ func newGRPCServer(configServer *environment.ServerConfig) *serverGRPS {
 
 // NewServer реализует фабричный метод.
 func NewServer(configServer *environment.ServerConfig) Server {
+	fmt.Println("+++++++++++++", configServer.TypeServer)
 	if configServer.TypeServer == constants.TypeSrvGRPC.String() {
 		return newGRPCServer(configServer)
 	}
