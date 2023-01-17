@@ -140,6 +140,7 @@ func FillHeader(h http.Header) general.Header {
 // Может принимать JSON в жатом виде gzip. Сохраняет значение в физическое и временное хранилище.
 func (s *HTTPServer) HandlerUpdatesMetricJSON(w http.ResponseWriter, r *http.Request) {
 
+	fmt.Println("+++++++++5")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		constants.Logger.ErrorLog(err)
@@ -159,7 +160,7 @@ func (s *HTTPServer) HandlerUpdatesMetricJSON(w http.ResponseWriter, r *http.Req
 // Может принимать JSON в жатом виде gzip.
 // Сохраняет значение в физическое и временное хранилище.
 func (s *HTTPServer) HandlerUpdateMetricJSON(rw http.ResponseWriter, rq *http.Request) {
-
+	fmt.Println("+++++++++6")
 	bytBody, err := io.ReadAll(rq.Body)
 	if err != nil {
 		constants.Logger.InfoLog(fmt.Sprintf("$$ 1 %s", err.Error()))
@@ -267,6 +268,7 @@ func (s *HTTPServer) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Re
 // Значение метрики записывается во временное хранилище метрик repository.MapMetrics
 func (s *HTTPServer) HandlerSetMetricaPOST(w http.ResponseWriter, r *http.Request) {
 
+	fmt.Println("+++++++++7")
 	//metType := mux.Vars(r)["metType"]
 	//metName := mux.Vars(r)["metName"]
 	//metValue := mux.Vars(r)["metValue"]
@@ -276,6 +278,7 @@ func (s *HTTPServer) HandlerSetMetricaPOST(w http.ResponseWriter, r *http.Reques
 	metValue := chi.URLParam(r, "metValue")
 
 	err := s.RepStore.HandlerSetMetricaPOST(metType, metName, metValue)
+	fmt.Println("+++++++++6")
 	w.WriteHeader(errs.StatusHTTP(err))
 	//w.WriteHeader(http.StatusBadRequest)
 	//fmt.Println(errs.StatusHTTP(err))
