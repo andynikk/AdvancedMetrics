@@ -16,7 +16,7 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/general"
 	"github.com/andynikk/advancedmetrics/internal/grpchandlers"
-	. "github.com/andynikk/advancedmetrics/internal/grpchandlers/api"
+	api2 "github.com/andynikk/advancedmetrics/internal/grpchandlers/api"
 	"github.com/andynikk/advancedmetrics/internal/handlers"
 	"github.com/andynikk/advancedmetrics/internal/handlers/api"
 	"github.com/andynikk/advancedmetrics/internal/middlware"
@@ -29,7 +29,7 @@ type serverHTTP struct {
 
 type serverGRPS struct {
 	storage grpchandlers.RepStore
-	srv     GRPCServer
+	srv     api2.GRPCServer
 }
 
 var buildVersion = "N/A"
@@ -60,7 +60,7 @@ func (s *serverHTTP) Start() error {
 func (s *serverGRPS) Start() error {
 
 	server := grpc.NewServer(middlware.WithServerUnaryInterceptor())
-	RegisterMetricCollectorServer(server, &s.srv)
+	api2.RegisterMetricCollectorServer(server, &s.srv)
 	l, err := net.Listen("tcp", constants.AddressServer)
 	if err != nil {
 		return err
@@ -134,7 +134,7 @@ func newGRPCServer(configServer *environment.ServerConfig) *serverGRPS {
 	gRepStore := general.New[grpchandlers.RepStore]()
 	gRepStore.Set(constants.TypeSrvGRPC.String(), server.storage)
 
-	srv := &GRPCServer{
+	srv := &api2.GRPCServer{
 		RepStore: gRepStore,
 	}
 	server.srv = *srv

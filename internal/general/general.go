@@ -276,9 +276,8 @@ func (rs *RepStore[T]) HandlerUpdatesMetricJSON(h Header, b []byte) error {
 
 	PK := rs.getPKRepStore()
 
-	err := errors.New("")
 	if strings.Contains(contentEncryption, constants.TypeEncryption) {
-		b, err = PK.RsaDecrypt(b)
+		_, err := PK.RsaDecrypt(b)
 
 		if err != nil {
 			constants.Logger.ErrorLog(err)
@@ -309,10 +308,10 @@ func (rs *RepStore[T]) HandlerUpdateMetricJSON(h Header, b []byte) error {
 	contentEncoding := h["content-encoding"]
 	contentEncryption := h["content-encryption"]
 
-	err := errors.New("")
+	//err := errors.New("")
 	if strings.Contains(contentEncryption, constants.TypeEncryption) {
 		PK := rs.getPKRepStore()
-		b, err = PK.RsaDecrypt(b)
+		_, err := PK.RsaDecrypt(b)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return errs.ErrDecrypt
@@ -320,7 +319,7 @@ func (rs *RepStore[T]) HandlerUpdateMetricJSON(h Header, b []byte) error {
 	}
 
 	if strings.Contains(contentEncoding, "gzip") {
-		b, err = compression.Decompress(b)
+		_, err := compression.Decompress(b)
 		if err != nil {
 			constants.Logger.InfoLog(fmt.Sprintf("$$ 2 %s", err.Error()))
 			return errs.ErrDecompress
@@ -330,7 +329,7 @@ func (rs *RepStore[T]) HandlerUpdateMetricJSON(h Header, b []byte) error {
 	bodyJSON := bytes.NewReader(b)
 
 	var v []encoding.Metrics
-	err = json.NewDecoder(bodyJSON).Decode(&v)
+	err := json.NewDecoder(bodyJSON).Decode(&v)
 	if err != nil {
 		constants.Logger.InfoLog(fmt.Sprintf("$$ 3 %s", err.Error()))
 		return errs.ErrGetJSON
@@ -435,9 +434,9 @@ func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b []byte) (Header, []by
 	contentEncryption := h["content-encryption"]
 
 	PK := rs.getPKRepStore()
-	err := errors.New("")
+	//err := errors.New("")
 	if strings.Contains(contentEncryption, constants.TypeEncryption) {
-		b, err = PK.RsaDecrypt(b)
+		_, err := PK.RsaDecrypt(b)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return nil, nil, errs.ErrDecrypt
@@ -445,7 +444,7 @@ func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b []byte) (Header, []by
 	}
 
 	if strings.Contains(contentEncoding, "gzip") {
-		b, err = compression.Decompress(b)
+		_, err := compression.Decompress(b)
 		if err != nil {
 			constants.Logger.ErrorLog(err)
 			return nil, nil, errs.ErrDecompress
@@ -455,7 +454,7 @@ func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b []byte) (Header, []by
 	bodyJSON := bytes.NewReader(b)
 
 	v := encoding.Metrics{}
-	err = json.NewDecoder(bodyJSON).Decode(&v)
+	err := json.NewDecoder(bodyJSON).Decode(&v)
 	if err != nil {
 		constants.Logger.ErrorLog(err)
 		return nil, nil, errs.ErrGetJSON
