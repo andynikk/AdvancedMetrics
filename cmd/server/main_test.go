@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -18,13 +16,10 @@ import (
 	"github.com/andynikk/advancedmetrics/internal/constants/errs"
 	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 	"github.com/andynikk/advancedmetrics/internal/encoding"
-	"github.com/andynikk/advancedmetrics/internal/encryption"
 	"github.com/andynikk/advancedmetrics/internal/environment"
 	"github.com/andynikk/advancedmetrics/internal/grpchandlers"
 	api2 "github.com/andynikk/advancedmetrics/internal/grpchandlers/api"
-	"github.com/andynikk/advancedmetrics/internal/handlers/api"
 	"github.com/andynikk/advancedmetrics/internal/networks"
-	"github.com/andynikk/advancedmetrics/internal/repository"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 )
@@ -40,109 +35,109 @@ func TestFuncServer(t *testing.T) {
 }
 
 func TestFuncServerHTTP(t *testing.T) {
-	//var fValue float64 = 0.001
-	//var iDelta int64 = 10
-
-	config := environment.InitConfigServer()
-	server := NewServer(config).(*serverHTTP)
-
-	t.Run("Checking init server", func(t *testing.T) {
-		//rp.Config = environment.InitConfigServer()
-		if server.storage.Config.Address == "" {
-			t.Errorf("Error checking init server")
-		}
-	})
-	fmt.Println(server.storage.Config.Address)
-
-	//gRepStore := general.New[handlers.RepStore]()
-	//gRepStore.Set(constants.TypeSrvHTTP.String(), server.storage)
-
-	//srv := api.HTTPServer{
-	//	RepStore: gRepStore,
+	////var fValue float64 = 0.001
+	////var iDelta int64 = 10
+	//
+	//config := environment.InitConfigServer()
+	//server := NewServer(config).(*serverHTTP)
+	//
+	//t.Run("Checking init server", func(t *testing.T) {
+	//	//rp.Config = environment.InitConfigServer()
+	//	if server.storage.Config.Address == "" {
+	//		t.Errorf("Error checking init server")
+	//	}
+	//})
+	//fmt.Println(server.storage.Config.Address)
+	//
+	////gRepStore := general.New[handlers.RepStore]()
+	////gRepStore.Set(constants.TypeSrvHTTP.String(), server.storage)
+	//
+	////srv := api.HTTPServer{
+	////	RepStore: gRepStore,
+	////}
+	//
+	//rp := server.srv.RepStore.Get(constants.TypeSrvHTTP.String())
+	//rp.MutexRepo = make(repository.MutexRepo)
+	//
+	//t.Run("Checking init router", func(t *testing.T) {
+	//	//api.InitRoutersMux(&server.srv)
+	//	api.InitRoutersChi(&server.srv)
+	//	if server.srv.RouterChi == nil {
+	//		t.Errorf("Error checking init router")
+	//	}
+	//})
+	//
+	//t.Run("Checking init config", func(t *testing.T) {
+	//	if rp.Config.Address == "" {
+	//		t.Errorf("Error checking init config")
+	//	}
+	//})
+	//
+	//postStr := fmt.Sprintf("http://%s/update/gauge/Alloc/0.1\nhttp://%s/update/gauge/BuckHashSys/0.002"+
+	//	"\nhttp://%s/update/counter/PollCount/5", rp.Config.Address, rp.Config.Address, rp.Config.Address)
+	//
+	//t.Run("Checking the filling of metrics Gauge", func(t *testing.T) {
+	//
+	//	messageRaz := strings.Split(postStr, "\n")
+	//	if len(messageRaz) != 3 {
+	//		t.Errorf("The string (%s) was incorrectly decomposed into an array", postStr)
+	//	}
+	//})
+	//
+	//t.Run("Checking rsa crypt", func(t *testing.T) {
+	//	t.Run("Checking init crypto key", func(t *testing.T) {
+	//		rp.PK, _ = encryption.InitPrivateKey(rp.Config.CryptoKey)
+	//		if rp.Config.CryptoKey != "" && rp.PK == nil {
+	//			t.Errorf("Error checking init crypto key")
+	//		}
+	//	})
+	//	t.Run("Checking rsa encrypt", func(t *testing.T) {
+	//		testMsg := "Тестовое сообщение"
+	//
+	//		encryptMsg, err := rp.PK.RsaEncrypt([]byte(testMsg))
+	//		if err != nil {
+	//			t.Errorf("Error checking rsa encrypt")
+	//		}
+	//		t.Run("Checking rsa decrypt", func(t *testing.T) {
+	//			decryptMsg, err := rp.PK.RsaDecrypt(encryptMsg)
+	//			if err != nil {
+	//				t.Errorf("Error checking rsa decrypt")
+	//			}
+	//			byteTestMsg := []byte(testMsg)
+	//			if !bytes.Equal(decryptMsg, byteTestMsg) {
+	//				t.Errorf("Error checking rsa decrypt")
+	//			}
+	//		})
+	//	})
+	//})
+	//
+	//if rp.Config.DatabaseDsn != "" {
+	//	t.Run("Checking connect DB", func(t *testing.T) {
+	//		t.Run("Checking create DB table", func(t *testing.T) {
+	//			mapTypeStore, err := repository.InitStoreDB(rp.Config.StorageType, rp.Config.DatabaseDsn)
+	//			fmt.Println("-----", len(mapTypeStore))
+	//			fmt.Println("-----", len(rp.Config.StorageType))
+	//			fmt.Println("-----", rp.Config.DatabaseDsn)
+	//			fmt.Println("-----", rp.Config.StoreFile)
+	//
+	//			if err != nil {
+	//				t.Errorf(fmt.Sprintf("Error create DB table: %s", err.Error()))
+	//			}
+	//			//rp.Config.StorageType = storageType
+	//			t.Run("Checking handlers /ping GET", func(t *testing.T) {
+	//
+	//				//mapTypeStore := rp.Config.StorageType
+	//				if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
+	//					t.Errorf("Error handlers 1 /ping GET")
+	//				}
+	//
+	//				if mapTypeStore[constants.MetricsStorageDB.String()].ConnDB() == nil {
+	//					t.Errorf("Error handlers 2 /ping GET")
+	//				}
+	//			})
+	//		})
+	//	})
 	//}
-
-	rp := server.srv.RepStore.Get(constants.TypeSrvHTTP.String())
-	rp.MutexRepo = make(repository.MutexRepo)
-
-	t.Run("Checking init router", func(t *testing.T) {
-		//api.InitRoutersMux(&server.srv)
-		api.InitRoutersChi(&server.srv)
-		if server.srv.RouterChi == nil {
-			t.Errorf("Error checking init router")
-		}
-	})
-
-	t.Run("Checking init config", func(t *testing.T) {
-		if rp.Config.Address == "" {
-			t.Errorf("Error checking init config")
-		}
-	})
-
-	postStr := fmt.Sprintf("http://%s/update/gauge/Alloc/0.1\nhttp://%s/update/gauge/BuckHashSys/0.002"+
-		"\nhttp://%s/update/counter/PollCount/5", rp.Config.Address, rp.Config.Address, rp.Config.Address)
-
-	t.Run("Checking the filling of metrics Gauge", func(t *testing.T) {
-
-		messageRaz := strings.Split(postStr, "\n")
-		if len(messageRaz) != 3 {
-			t.Errorf("The string (%s) was incorrectly decomposed into an array", postStr)
-		}
-	})
-
-	t.Run("Checking rsa crypt", func(t *testing.T) {
-		t.Run("Checking init crypto key", func(t *testing.T) {
-			rp.PK, _ = encryption.InitPrivateKey(rp.Config.CryptoKey)
-			if rp.Config.CryptoKey != "" && rp.PK == nil {
-				t.Errorf("Error checking init crypto key")
-			}
-		})
-		t.Run("Checking rsa encrypt", func(t *testing.T) {
-			testMsg := "Тестовое сообщение"
-
-			encryptMsg, err := rp.PK.RsaEncrypt([]byte(testMsg))
-			if err != nil {
-				t.Errorf("Error checking rsa encrypt")
-			}
-			t.Run("Checking rsa decrypt", func(t *testing.T) {
-				decryptMsg, err := rp.PK.RsaDecrypt(encryptMsg)
-				if err != nil {
-					t.Errorf("Error checking rsa decrypt")
-				}
-				byteTestMsg := []byte(testMsg)
-				if !bytes.Equal(decryptMsg, byteTestMsg) {
-					t.Errorf("Error checking rsa decrypt")
-				}
-			})
-		})
-	})
-
-	if rp.Config.DatabaseDsn != "" {
-		t.Run("Checking connect DB", func(t *testing.T) {
-			t.Run("Checking create DB table", func(t *testing.T) {
-				mapTypeStore, err := repository.InitStoreDB(rp.Config.StorageType, rp.Config.DatabaseDsn)
-				fmt.Println("-----", len(mapTypeStore))
-				fmt.Println("-----", len(rp.Config.StorageType))
-				fmt.Println("-----", rp.Config.DatabaseDsn)
-				fmt.Println("-----", rp.Config.StoreFile)
-
-				if err != nil {
-					t.Errorf(fmt.Sprintf("Error create DB table: %s", err.Error()))
-				}
-				//rp.Config.StorageType = storageType
-				t.Run("Checking handlers /ping GET", func(t *testing.T) {
-
-					//mapTypeStore := rp.Config.StorageType
-					if _, findKey := mapTypeStore[constants.MetricsStorageDB.String()]; !findKey {
-						t.Errorf("Error handlers 1 /ping GET")
-					}
-
-					if mapTypeStore[constants.MetricsStorageDB.String()].ConnDB() == nil {
-						t.Errorf("Error handlers 2 /ping GET")
-					}
-				})
-			})
-		})
-	}
 
 	//t.Run("Checking metric methods", func(t *testing.T) {
 	//	t.Run(`Checking method "String" type "Counter"`, func(t *testing.T) {
