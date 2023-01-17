@@ -80,7 +80,7 @@ func InitRoutersChi(s *HTTPServer) {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.StripSlashes)
+	//r.Use(middleware.StripSlashes)
 
 	r.HandleFunc("/", s.HandleFunc)
 	r.NotFound(s.HandlerNotFound)
