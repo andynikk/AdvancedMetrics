@@ -1,8 +1,6 @@
-package main
+package main_test
 
-//
 //import (
-//	"context"
 //	"encoding/json"
 //	"net"
 //	"os"
@@ -14,7 +12,7 @@ package main
 //	"github.com/andynikk/advancedmetrics/internal/constants/errs"
 //	"github.com/andynikk/advancedmetrics/internal/cryptohash"
 //	"github.com/andynikk/advancedmetrics/internal/encoding"
-//	"github.com/andynikk/advancedmetrics/internal/general"
+//	"github.com/andynikk/advancedmetrics/internal/environment"
 //	"github.com/andynikk/advancedmetrics/internal/grpchandlers"
 //	"github.com/andynikk/advancedmetrics/internal/grpchandlers/api"
 //	"github.com/andynikk/advancedmetrics/internal/networks"
@@ -22,35 +20,34 @@ package main
 //	"google.golang.org/grpc/metadata"
 //)
 //
-//func TestFuncServer(t *testing.T) {
-//	server := new(server)
+//func TestFuncServerGRPC(t *testing.T) {
 //
-//	t.Run("Checking init server", func(t *testing.T) {
+//	config := environment.InitConfigServer()
+//	server := NewServer(config).(*serverGRPS)
+//
+//	t.Run("Checking init server (gRPC)", func(t *testing.T) {
 //		grpchandlers.NewRepStore(&server.storage)
 //		if server.storage.Config.Address == "" {
-//			t.Errorf("Error checking init server")
+//			t.Errorf("Error checking init server (gRPC)")
 //		}
 //	})
 //
-//	gRepStore := general.New[grpchandlers.RepStore]()
-//	data := gRepStore.Get(constants.TypeSrvGRPC.String())
+//	server.srv.RepStore.Set(constants.TypeSrvGRPC.String(), server.storage)
+//	data := server.srv.RepStore.Get(constants.TypeSrvGRPC.String())
 //
-//	t.Run("Checking init generics val", func(t *testing.T) {
-//		gRepStore.Set(constants.TypeSrvGRPC.String(), server.storage)
-//
-//		data = gRepStore.Get(constants.TypeSrvGRPC.String())
+//	t.Run("Checking init generics val (gRPC)", func(t *testing.T) {
 //		if data.Config.Address == "" {
-//			t.Errorf("Error checking init generics val")
+//			t.Errorf("Error checking init generics val (gRPC)")
 //		}
 //	})
 //
 //	var IPAddress string
-//	t.Run("Checking get current IP", func(t *testing.T) {
+//	t.Run("Checking get current IP (gRPC)", func(t *testing.T) {
 //		hn, _ := os.Hostname()
 //		IPs, _ := net.LookupIP(hn)
 //		IPAddress = networks.IPv4RangesToStr(IPs)
 //		if IPAddress == "" {
-//			t.Errorf("Error checking get current IP")
+//			t.Errorf("Error checking get current IP (gRPC)")
 //		}
 //	})
 //
@@ -66,18 +63,18 @@ package main
 //
 //	ctx = metadata.NewOutgoingContext(ctx, md)
 //
-//	GRPCServer := api.GRPCServer{gRepStore}
+//	GRPCServer := api.GRPCServer{RepStore: server.srv.RepStore}
 //
-//	t.Run("Checking handlers PING", func(t *testing.T) {
+//	t.Run("Checking handlers PING (gRPC)", func(t *testing.T) {
 //
 //		req := api.EmptyRequest{}
 //		textErr, err := GRPCServer.PingDataBases(ctx, &req)
 //		if errs.CodeGRPC(err) != codes.OK {
-//			t.Errorf("Error checking handlers PING. %s", textErr)
+//			t.Errorf("Error checking handlers PING (gRPC). %s", textErr)
 //		}
 //	})
 //
-//	t.Run("Checking handlers Update", func(t *testing.T) {
+//	t.Run("Checking handlers Update (gRPC)", func(t *testing.T) {
 //		tests := []struct {
 //			name           string
 //			request        api.UpdateRequest
@@ -95,13 +92,13 @@ package main
 //			t.Run(tt.name, func(t *testing.T) {
 //				textErr, err := GRPCServer.UpdateOneMetrics(ctx, &tt.request)
 //				if errs.CodeGRPC(err) != tt.wantStatusCode {
-//					t.Errorf("Error checking handlers Update (%s). %s", textErr, tt.name)
+//					t.Errorf("Error checking handlers Update (gRPC %s). %s", textErr, tt.name)
 //				}
 //			})
 //		}
 //	})
 //
-//	t.Run("Checking handlers Update JSON", func(t *testing.T) {
+//	t.Run("Checking handlers Update JSON (gRPC)", func(t *testing.T) {
 //		tests := []struct {
 //			name           string
 //			request        encoding.Metrics
@@ -126,12 +123,12 @@ package main
 //				t.Run("Checking gzip", func(t *testing.T) {
 //					arrMetrics, err := json.MarshalIndent(storedData, "", " ")
 //					if err != nil {
-//						t.Errorf("Error checking gzip. %s", tt.name)
+//						t.Errorf("Error checking gzip (gRPC). %s", tt.name)
 //					}
 //
 //					gziparrMetrics, err = compression.Compress(arrMetrics)
 //					if err != nil {
-//						t.Errorf("Error checking gzip. %s", tt.name)
+//						t.Errorf("Error checking gzip (gRPC). %s", tt.name)
 //					}
 //
 //				})
@@ -139,13 +136,13 @@ package main
 //				req := api.UpdateStrRequest{Body: gziparrMetrics}
 //				textErr, err := GRPCServer.UpdateOneMetricsJSON(ctx, &req)
 //				if errs.CodeGRPC(err) != tt.wantStatusCode {
-//					t.Errorf("Error checking handlers Update JSON (%s). %s", textErr, tt.name)
+//					t.Errorf("Error checking handlers Update JSON (gRPC %s). %s", textErr, tt.name)
 //				}
 //			})
 //		}
 //	})
 //
-//	t.Run("Checking handlers Updates JSON", func(t *testing.T) {
+//	t.Run("Checking handlers Updates JSON (gRPC)", func(t *testing.T) {
 //		var storedData encoding.ArrMetrics
 //		storedData = append(storedData, testMericGouge(data.Config.Key))
 //		storedData = append(storedData, testMericCaunter(data.Config.Key))
@@ -162,11 +159,11 @@ package main
 //		req := api.UpdatesRequest{Body: gziparrMetrics}
 //		_, err = GRPCServer.UpdatesAllMetricsJSON(ctx, &req)
 //		if errs.CodeGRPC(err) != codes.OK {
-//			t.Errorf("Error checking handlers Update JSON.")
+//			t.Errorf("Error checking handlers Update JSON (gRPC)")
 //		}
 //	})
 //
-//	t.Run("Checking handlers Value JSON", func(t *testing.T) {
+//	t.Run("Checking handlers Value JSON (gRPC)", func(t *testing.T) {
 //
 //		tests := []struct {
 //			name           string
@@ -188,24 +185,24 @@ package main
 //
 //				arrMetrics, err := json.MarshalIndent(tt.request, "", " ")
 //				if err != nil {
-//					t.Errorf("Error checking gzip. %s", tt.name)
+//					t.Errorf("Error checking gzip (gRPC). %s", tt.name)
 //				}
 //
 //				gziparrMetrics, err := compression.Compress(arrMetrics)
 //				if err != nil {
-//					t.Errorf("Error checking gzip. %s", tt.name)
+//					t.Errorf("Error checking gzip (gRPC). %s", tt.name)
 //				}
 //
 //				req := api.UpdatesRequest{Body: gziparrMetrics}
 //				textErr, err := GRPCServer.GetValueJSON(ctx, &req)
 //				if errs.CodeGRPC(err) != tt.wantStatusCode {
-//					t.Errorf("Error checking handlers Value JSON (%s). %s", textErr, tt.name)
+//					t.Errorf("Error checking handlers Value JSON  (gRPC %s). %s", textErr, tt.name)
 //				}
 //			})
 //		}
 //	})
 //
-//	t.Run("Checking handlers Value", func(t *testing.T) {
+//	t.Run("Checking handlers Value (gRPC)", func(t *testing.T) {
 //
 //		tests := []struct {
 //			name           string
@@ -228,20 +225,20 @@ package main
 //				req := api.UpdatesRequest{Body: []byte(tt.request)}
 //				textErr, err := GRPCServer.GetValue(ctx, &req)
 //				if errs.CodeGRPC(err) != tt.wantStatusCode {
-//					t.Errorf("Error checking handlers Value (%s). %s", textErr, tt.name)
+//					t.Errorf("Error checking handlers Value  (gRPC %s). %s", textErr, tt.name)
 //				}
 //			})
 //		}
 //	})
 //
-//	t.Run("Checking handlers ListMetrics", func(t *testing.T) {
+//	t.Run("Checking handlers ListMetrics (gRPC)", func(t *testing.T) {
 //
 //		req := api.EmptyRequest{}
 //		res, _ := GRPCServer.GetListMetrics(ctx, &req)
 //
 //		if !strings.Contains(string(res.Result), "TestGauge") ||
 //			!strings.Contains(string(res.Result), "TestCounter") {
-//			t.Errorf("Error checking handlers ListMetrics.")
+//			t.Errorf("Error checking handlers ListMetrics (gRPC)")
 //		}
 //	})
 //

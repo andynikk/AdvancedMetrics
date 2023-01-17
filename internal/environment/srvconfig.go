@@ -78,7 +78,7 @@ func GetServerConfigFile(file *string) ServerConfigFile {
 func InitConfigServer() *ServerConfig {
 	constants.Logger.Log = zerolog.New(os.Stdout).Level(zerolog.InfoLevel)
 
-	sc := ServerConfig{}
+	sc := new(ServerConfig)
 	sc.InitConfigServerENV()
 	sc.InitConfigServerFlag()
 	sc.InitConfigServerFile()
@@ -87,7 +87,7 @@ func InitConfigServer() *ServerConfig {
 	sc.StorageType, _ = repository.InitStoreDB(sc.StorageType, sc.DatabaseDsn)
 	sc.StorageType, _ = repository.InitStoreFile(sc.StorageType, sc.StoreFile)
 
-	return &sc
+	return sc
 }
 
 func (sc *ServerConfig) InitConfigServerENV() {
