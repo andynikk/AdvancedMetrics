@@ -109,6 +109,7 @@ func InitRoutersChi(s *HTTPServer) {
 
 func (s *HTTPServer) HandlerNotFound(rw http.ResponseWriter, r *http.Request) {
 
+	fmt.Println("+++++++++12", "aa")
 	http.Error(rw, "Метрика "+r.URL.Path+" не найдена", http.StatusNotFound)
 
 }
@@ -151,7 +152,7 @@ func FillHeader(h http.Header) general.Header {
 // Может принимать JSON в жатом виде gzip. Сохраняет значение в физическое и временное хранилище.
 func (s *HTTPServer) HandlerUpdatesMetricJSON(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("+++++++++5")
+	fmt.Println("+++++++++5", "updates JSON")
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		constants.Logger.ErrorLog(err)
@@ -171,7 +172,7 @@ func (s *HTTPServer) HandlerUpdatesMetricJSON(w http.ResponseWriter, r *http.Req
 // Может принимать JSON в жатом виде gzip.
 // Сохраняет значение в физическое и временное хранилище.
 func (s *HTTPServer) HandlerUpdateMetricJSON(rw http.ResponseWriter, rq *http.Request) {
-	fmt.Println("+++++++++6")
+	fmt.Println("+++++++++6", "update JSON")
 	bytBody, err := io.ReadAll(rq.Body)
 	if err != nil {
 		constants.Logger.InfoLog(fmt.Sprintf("$$ 1 %s", err.Error()))
@@ -211,6 +212,7 @@ func (s *HTTPServer) HandlerGetAllMetrics(rw http.ResponseWriter, rq *http.Reque
 // Где metType наименование типа метрики, metName наименование метрики
 func (s *HTTPServer) HandlerGetValue(rw http.ResponseWriter, rq *http.Request) {
 
+	fmt.Println("+++++++++13", "value/{}")
 	//metName := mux.Vars(rq)["metName"]
 	metName := chi.URLParam(rq, "metName")
 
@@ -252,7 +254,7 @@ func (s *HTTPServer) HandlerPingDB(rw http.ResponseWriter, rq *http.Request) {
 func (s *HTTPServer) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Request) {
 
 	smm := s.RepStore.GetSyncMapMetricsRepStore()
-	fmt.Println("+++++++++9", len(smm.MutexRepo))
+	fmt.Println("+++++++++9", "value JSON", len(smm.MutexRepo))
 	h := FillHeader(rq.Header)
 
 	bytBody, err := io.ReadAll(rq.Body)
@@ -282,7 +284,7 @@ func (s *HTTPServer) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Re
 // Значение метрики записывается во временное хранилище метрик repository.MapMetrics
 func (s *HTTPServer) HandlerSetMetricaPOST(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("+++++++++7")
+	fmt.Println("+++++++++7", "update/{}")
 	//metType := mux.Vars(r)["metType"]
 	//metName := mux.Vars(r)["metName"]
 	//metValue := mux.Vars(r)["metValue"]
