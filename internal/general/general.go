@@ -222,6 +222,8 @@ func (rs *RepStore[T]) setValueInMap(metType string, metName string, metValue st
 		} else {
 
 			valG := repository.Gauge(0)
+			smm.MutexRepo[metName] = &valG
+
 			if ok := valG.SetFromText(metValue); !ok {
 				return http.StatusBadRequest
 			}
@@ -237,6 +239,7 @@ func (rs *RepStore[T]) setValueInMap(metType string, metName string, metValue st
 		} else {
 
 			valC := repository.Counter(0)
+			smm.MutexRepo[metName] = &valC
 			if ok := valC.SetFromText(metValue); !ok {
 				return http.StatusBadRequest
 			}
