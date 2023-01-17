@@ -87,11 +87,22 @@ func InitRoutersChi(s *HTTPServer) {
 
 	r.Get("/", s.HandlerGetAllMetrics)
 	r.Get("/value/{metType}/{metName}", s.HandlerGetValue)
+	r.Get("/value/{metType}/{metName}/", s.HandlerGetValue)
+
 	r.Post("/update/{metType}/{metName}/{metValue}", s.HandlerSetMetricaPOST)
+	r.Post("/update/{metType}/{metName}/{metValue}/", s.HandlerSetMetricaPOST)
+
 	r.Post("/update", s.HandlerUpdateMetricJSON)
+	r.Post("/update/", s.HandlerUpdateMetricJSON)
+
 	r.Post("/updates", s.HandlerUpdatesMetricJSON)
+	r.Post("/updates/", s.HandlerUpdatesMetricJSON)
+
 	r.Post("/value", s.HandlerValueMetricaJSON)
+	r.Post("/value/", s.HandlerValueMetricaJSON)
+
 	r.Get("/ping", s.HandlerPingDB)
+	r.Get("/ping/", s.HandlerPingDB)
 
 	s.RouterChi = r
 }
