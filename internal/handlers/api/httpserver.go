@@ -250,10 +250,12 @@ func (s *HTTPServer) HandlerValueMetricaJSON(rw http.ResponseWriter, rq *http.Re
 
 	_, b, err := s.RepStore.HandlerValueMetricaJSON(h, &bytBody)
 	if err != nil {
+		fmt.Println("+++++++++1", err)
 		http.Error(rw, err.Error(), errs.StatusHTTP(err))
 		return
 	}
 
+	fmt.Println("+++++++++2", string(b))
 	if _, err = rw.Write(b); err != nil {
 		constants.Logger.ErrorLog(err)
 		return

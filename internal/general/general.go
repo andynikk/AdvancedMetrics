@@ -429,7 +429,7 @@ func (rs *RepStore[T]) Updates(msg []byte) error {
 // Может принимать JSON в жатом виде gzip. Возвращает значение метрики по типу и наименованию.
 func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b *[]byte) (Header, []byte, error) {
 
-	//acceptEncoding := h["accept-encoding"]
+	acceptEncoding := h["accept-encoding"]
 	contentEncoding := h["content-encoding"]
 	contentEncryption := h["content-encryption"]
 
@@ -490,12 +490,11 @@ func (rs *RepStore[T]) HandlerValueMetricaJSON(h Header, b *[]byte) (Header, []b
 	}
 
 	hReturn := Header{}
-	hReturn["content-type"] = "application/json"
+	hReturn["Content-Type"] = "application/json"
 
 	var bodyBate []byte
-	//if strings.Contains(acceptEncoding, "gzip") {
-	if strings.Contains(contentEncoding, "gzip") {
-		hReturn["content-encoding"] = "gzip"
+	if strings.Contains(acceptEncoding, "gzip") {
+		hReturn["Content-Encoding"] = "gzip"
 		bodyBate = compData
 	} else {
 		bodyBate = metricsJSON
